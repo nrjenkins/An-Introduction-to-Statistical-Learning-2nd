@@ -1,0 +1,235 @@
+---
+title: 'Chapter 5: Resampling Methods'
+author: "Nick Jenkins"
+date: '2022-04-08'
+output: html_document
+---
+
+Resampling methods involve repeatedly drawing samples from a training set and refitting a model of interest on each sample in order to obtain additional information about the fitted model. Two of the most common methods of doing this are *cross-validation* and *bootstrapping*. 
+
+Cross-validation can be used to estimate the test error associated with a given statistical learning method in order to evaluate its performance, or to select the appropriate level of flexibility. The process of evaluating a model's performance is known as model assessment and the process of selecting the proper level of flexibility is known as model selection. 
+
+The bootstrap is used in several contexts, most commonly to provide a measure of accuracy of a parameter estimate or of a given statistical learning method. 
+
+# Cross-validation
+
+The test error rate is the average error that results from using a statistical learning method to predict the response on a new observation. The use of a particular statistical learning method is warranted if it results in a low test error. If we don't have a large test set, then we need to figure out a new way to estimate the test error rate. Cross-validation is a way of estimating the test error way by holding out a subset of the training observations from the fitting process and then applying the statistical learning method to those held out observations. 
+
+## The Validation Set Approach
+
+The validation set approach involves randomly dividing the available set of observations into two parts, a training set and a validation set or hold-out set. The model is fit on the training set and is used to predict observations in the validation set. The validation set approach has two potential drawbacks:
+
+1. The validation estimate of the test error rate can be highly variable, depending on precisely which observations are included in the training set and which observations are included in the validation set. 
+
+2. Only a subset of the observations - those that are included in the training set rather than in the validation set - are used to fit the model. This means that the validation set error rate may tend to *overestimate* the test error rate for the model fit on the entire data set. 
+
+## Leave-One-Out Cross-Validation
+
+LOOCV attempts to address these drawbacks. LOOCV involves splitting the set of observations into two parts. However, instead of creating subsets of compatible size, a single observation is used for the validation set, and the remaining observations make up the training set. This process can be repeated *n* times. 
+
+LOOCV has far less bias. It tends not to overestimate the test error rate as much as the validation set approach does. Second, performing LOOCV multiple times will always yield the same results. 
+
+## k-Fold Cross-Validation
+
+This approach involves randomly dividing the set of observations into k groups, or folds, of approximately equal size. The first fold is treated as a validation set, and the method is fit on the remaining $k-1$ folds. This procedure is repeated *k* times; each time, a different group of observations is treated as a validation set. 
+
+## Bias-Variance Trade-Off for k_fold Cross-Validation
+
+*k*-fold CV is usually less computationally intensive than LOOCV and it also tends to give more accurate estimates of the test error rate than does LOOCV, but a higher bias because the training set contains fewer observations. 
+
+## Cross-Validation on Classification Problems
+
+With quantitative outcomes, we use MSE to quantify test error. With qualitative outcomes, we use the number of missclassified observations. 
+
+# The Bootstrap
+
+The bootstrap can be used to quantify the uncertainty associated with a given estimator or statistical learning method. We randomly select *n* observations from the data set in order to produce a bootstrap data set. The sampling is performed with replacement, which means that the same observations can occur more than once in the bootstrap data set. 
+
+# Lab: Cross-Validation and the Bootstrap
+
+```{r}
+library(tidymodels)
+library(ISLR2)
+
+auto <- tibble(Auto)
+portfolio <- tibble(Portfolio)
+```
+
+## The Validation Set Approach
+
+The `strata` argument ensures that both sides of the split have roughly the same distribution for each value of `strata`. 
+
+```{r}
+set.seed(1)
+auto_split <- initial_split(auto, strata = mpg, prop = 0.5)
+auto_split
+
+auto_train <- training(auto_split)
+auto_test <- testing(auto_split)
+```
+
+Now we fit a linear regression:
+
+```{r}
+lm_model <- 
+  linear_reg() %>% 
+  set_engine("lm") %>% 
+  set_mode("regression")
+
+lm_fit <- 
+  lm_model %>% 
+  fit(mpg ~ horsepower, data = auto_train)
+
+tidy(lm_fit)
+
+# test rmse
+augment(lm_fit, new_data = auto_test) %>% 
+  rmse(truth = mpg, estimate = .pred)
+
+# training rmse
+augment(lm_fit, new_data = auto_train) %>% 
+  rmse(truth = mpg, estimate = .pred)
+```
+
+Now the polynomial fit.
+
+```{r}
+poly_rec <- 
+  recipe(mpg ~ horsepower, data = auto_train) %>% 
+  step_poly(horsepower, degree = 2)
+
+poly_wflow <- 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(poly_rec)
+
+poly_fit <- fit(poly_wflow, data = auto_train)
+tidy(poly_fit)
+
+# test rmse
+augment(poly_fit, new_data = auto_test) %>% 
+  rmse(truth = mpg, estimate = .pred)
+```
+
+## Leave-One-Out Cross-Validation
+
+```{r}
+auto_loocv <- loo_cv(auto)
+
+lm_fit_loocv <- 
+  lm_model %>% 
+  fit_resamples(mpg ~ horsepower, resamples = auto_loocv)
+```
+
+## k-Fold Cross-Validation
+
+```{r}
+auto_vfold <- vfold_cv(auto_train, v = 10)
+
+lm_fit_loocv <- 
+  lm_model %>% 
+  fit_resamples(mpg ~ horsepower, resamples = auto_vfold)
+collect_metrics(lm_fit_loocv)
+```
+
+What if we wanted to find what degree of polynomial best fit the data?
+
+```{r}
+poly_tuned_rec <- 
+  recipe(mpg ~ horsepower, data = auto_train) %>% 
+  step_poly(horsepower, degree = tune())
+
+poly_tuned_wflow <- 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(poly_tuned_rec)
+```
+
+Before we can fit the model, we need to create a `tibble` of possible values for the polynomial to try. 
+
+```{r}
+degree_grid <- grid_regular(degree(range = c(1, 10)), levels = 10)
+degree_grid
+```
+
+Now we pass the values to a `tune_grid()` to fit the models within each fold for each value specified in `degree_grid`.
+
+```{r}
+tune_res <- 
+  tune_grid(object = poly_tuned_wflow,
+            resamples = auto_vfold,
+            grid = degree_grid)
+
+autoplot(tune_res) +
+  scale_x_continuous(breaks = seq(from = 0, to = 10, by = 1))
+```
+
+To see the performance metrics for each fold, we use `collect_metrics()`
+
+```{r}
+collect_metrics(tune_res)
+```
+
+We can also show the best performing models like this:
+
+```{r}
+show_best(tune_res, metric = "rmse")
+```
+
+There are other functions to select model with more complicated rules. We will use `select_by_one_std_err()` which selects the most simple model that is within one standard error of the numerically optimal results. 
+
+```{r}
+select_by_one_std_err(tune_res, degree, metric = "rmse")
+```
+
+With the best `degree` selected, we'll finalize the workflow and refit the model. 
+
+```{r}
+best_degree <- select_by_one_std_err(tune_res, degree, metric = "rmse")
+
+final_wflow <- finalize_workflow(poly_wflow, best_degree)
+final_wflow
+
+final_fit <- fit(final_wflow, auto_train)
+tidy(final_fit)
+```
+
+## The Bootstrap
+
+```{r}
+portfolio_boots <- bootstraps(portfolio, times = 1000)
+portfolio_boots
+
+alpha_fun <- function(split) {
+  data <- analysis(split)
+  X <- data$X
+  Y <- data$Y
+  
+  (var(Y) - cov(X, Y)) / (var(X) + var(Y) - 2 * cov(X, Y))
+}
+
+alpha_res <- 
+  portfolio_boots %>% 
+  mutate(alpha = map_dbl(splits, alpha_fun))
+alpha_res
+
+
+auto_boots <- bootstraps(auto)
+
+boot_fn <- function(split) {
+  lm_fit <- lm_model %>% fit(mpg ~ horsepower, data = analysis(split))
+  tidy(lm_fit)
+}
+
+boot_res <- 
+  auto_boots %>% 
+  mutate(models = map(splits, boot_fn))
+
+boot_res  %>% 
+  unnest(cols = c(models)) %>% 
+  select(term, estimate) %>% 
+  ggplot(aes(x = estimate)) +
+  geom_density() +
+  facet_wrap(vars(term), scales = "free_x", nrow = 2)
+```
+

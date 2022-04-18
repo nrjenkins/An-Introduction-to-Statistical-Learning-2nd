@@ -1,0 +1,434 @@
+---
+title: 'Chapter 6: Linear Model Selection and Regularization'
+author: "Nick Jenkins"
+date: '2022-04-11'
+output: html_document
+---
+
+There are many alternatives to using least squares to fit models that could improve model interpretability and predictive accuracy. We will discuss three important classes of methods:
+
+1. *Subset Selection*: involves identifying a subset of the *p* predictors that we believe to be relateed to the response. We then fit a model using least squares on the reduced set of variables
+
+2. *Shrinkage*: involves fitting a model with all *p* predictors. However the estimated coefficients are shrunken towards zero relative to the least squares estimates. This shrinkage reduces variance. 
+
+3. *Dimension Reduction*: involves *projecting* the *p* predictors into an M-dimensional subspace, where M < p. 
+
+# Subset Selection
+
+## Best Subset Selection
+
+We fit separate least squares regression for each possible combination of *p* predictors then pick the one with the best performance on the test data - this involves cross-validation. 
+
+The best subset approach fails when *p* is very large. 
+
+## Stepwise Selection
+
+### Forward Stepwise Selection
+
+Forward stepwise selection is a computationally efficient alternative to best subset selection because it considers a much smaller set of models. Forward stepwise selection begins with a model containing no predictors, and then adds predictors to the model, one-at-a-time, until all the predictors are in the model. At each step, the variable that gives the greatest *additional* improvement to the fit is added to the model. 
+
+### Backward Stepwise Selection
+
+Backward stepwise selection begins with the full least squares model containing all *p* predictors, and then iteratively removes the least useful predictor, one-at-a-time. 
+
+## Choosing the Optimal Model
+
+In order to select the best model with respect to test error, we need to estimate this test error. There are two common approaches:
+
+1. We can indirectly estimate test error by making an *adjustment* to the training error to account for the bias due to overfitting. 
+
+2. We can *directly* estimate the test error, using either a validation set approach or a cross-validation approach, as discussed in Chapter 5. 
+
+### $C_p$, AIC, BIC, and Adjusted $R^2$
+
+The $C_p$ is an estimate of the variance of the error associated with each response measurement. It adds a penalty to the training RSS in order to adjust for the fact that the training error tends to underestimate the test error. It tends to have a small value for models with a low test error. The $C_p$ is proportional to the AIC. 
+
+BIC places a heavier penalty on models so it usually selects smaller models. 
+
+### Validation and Cross-Validation
+
+We can also directly estimate the test error using validation set and cross-validation methods. When there are multiple models that appear to be equally good, we might want to select the smallest model that is within one-standard-error of the lowest point on the curve. 
+
+# Shrinkage Methods
+
+The two best-known techniques for shrinking the regression coefficients towards zero are *ridge regression* and the *lasso*. 
+
+## Ridge Regression
+
+Ridge regression is similar to least squares, but the coefficients are estimated by minizing a slightly different quantity. Like least squares, ridge regression seeks coefficient estimates that fit the data well, by making the RSS small, but it has a second term called a *shrinkage penalty** that is small when the coefficients are close to zero. This shrinks the estimates of the coefficients towards zero. 
+
+### Why Does Ridge Regression Improve OVer Least Squares?
+
+The advantage is rooted in the bias-variance trade-off. As $\lambda$ increases, the flexibility of the ridge regression fit decreases, leading to decreased variance but increased bias. 
+
+In general, when the relationship between the response and the predictors is close to linear, the least squares estimates will ahve low bias but may have high variance. This means that a small change in the training data can cause a large change in the least squares coefficient estimates. If $p > n$, then the least squares estimates do not have a unique solution, where ridge regression can still perform well by trading off a small increase in bias for a large decrease in variance. Ridge regression works well in situations where the least squares estimates have high variance. 
+
+## The Lasso
+
+One disadvantage of ridge regression is that the final model will include all predictors. The *lasso* isa recent alternative to ridge regression. The lasso  shrinks the coefficient estimates towards zero. It can force some of the coefficient estimates to be exactly equal to zero when the tuning parameter $\lambda$ is sufficiently large. Hence, lasso performs *varianble selection*. The lasso yields *sparse* models - models that only involve a subset of the variables. 
+
+In general, lasso will perform better when a relatively small number of predictors have substantial coefficients, and the remaining predictors have coefficients that are very small or that equal zero. Ridge regression will perform better when the response is a function of many predictors, all with coefficients of roughly equal size. 
+
+In ridge regression, each least squares coefficient estimate is shurnken by the same proportion. In contrast, the lasso shrinks each least squares coefficient towards zero by a constant amount. 
+
+## Selecting the Tuning Parameter
+
+Implementing ridge and lasso regression requires selecint a value for the tuning parameter $\lambda$. Cross-validation provides a simple way to tackle this problem. We choose a grid of $\lambda$ values, and compute the cross-validation error for each value of $\lambda$. When then pick the tuning parameter that makes the cross-validation error the smallest. 
+
+# Dimension Reduction Methods
+
+The methods so far have controlled variance by either using a subset of the original variables, or by shrinking their coefficients towards zero. We now explore methods that *transform* the predictors and then fit a least squares model using the transformed variables. There are referred to as *dimension reduction* methods. 
+
+All dimension reduction methods work in two steps: First, the transformed predictors are obtained. Second, the model is fit using these *M* predictors. Two approaches for this task are *principal components* and *partial least squares*. 
+
+## Principal Components Regression
+
+### An Overview of Principal Components Analysis
+
+PCA is a technique for reducing the dimension of an $n x p$ data matrix. The first principal component direction of the data is that along which the observations vary the most. The first component is summarized with the principal component loadings. The first principal component is chosen so that the projected observations are *as close as possible* to the original observations. 
+
+The principal components scores can be thought of as single number summaries of the relationships between two variable observations. 
+
+### The Principal Components Regression Approach
+
+The PCR approach involves constructing the first *M* principal components and then using these components as the predictors in a linear regression model that is fit using least squares. The idea is that a small number of principal components suffice to explain most of the variability in the data, as well as the relationship with the response. 
+
+PCR will do well when the first few principal components are sufficient to capture most of the variation in the predictors as well as the relationship with the response. In PCR the number of principal components is typically chosen by cross-validation. Variables used in PCR should be standardized. 
+
+## Partial Least Squares
+
+The PCR approach involves identifying linear combinations, or directions, that best represent the predictors. These directions are identified in an *unsupervised* way since, the response $Y$ is not used to help determine the principal component directions. That is, the response does not *supervise* the identification of the principal components. As a result, there is no guarantee that the directions that best explain the predictors will also be the best directions to use for predicting the response. 
+
+Partial least squares is a *supervised* alternative to PCR. It works by first identifying a new set of features that are linear combinations of the original features, and then fits a linear model via least squares using these *M* new features. In doing so, it uses $Y$ to identify new features that are related to the response. 
+
+To identify the first PLS direction, PLS sets each weight coefficient equal to the coefficient from the simple linear regression of $Y$ onto $X_j$. To identify the second direction, we first *adjust* each of the variables for $Z_1$ by regressing each variable on $Z_1$ and taking *residuals*. The residuals can be interpreted as the remaining information that has not been explained by the first PLS direction. The supervised dimension reduction of PLS can reduce bias, but it can slo increase variance. 
+
+# Considerations in High Dimensions
+
+## High-Dimensional Data
+
+Low-dimension data is when $n > p$. Data sets containing more features than observations are often referred to as *high-dimensional*. 
+
+## What Goes Wrong in High Dimensions?
+
+When $p > n$, a simple least squares regression line is too flexible and hence overfits the data. 
+
+Another issue is that as regressors are added to the model, the $R^2$ in the training data increases to 1 and the MSE reduces to 0 - even if the regressors are unrelated to the response. When the model is applied to the training data, the MSE becomes extremely large. 
+
+## Regression in High Dimensions
+
+Methods for fitting *less flexible* least squares models, such as forward stepwise selection, ridge regression, the lasso, and principal components regression, are particularly useful for performing regression in the high-dimensional setting. These approaches avoid overfitting by using a less flexible fitting approach than least squares. 
+
+Adding additional features to a model will improve predictive models if they are relevant to the response, but will lead to worse results if they are not. Even if they are relevant, the variance incurred in fitting their coefficients may outweight the reduction in bias that they bring. 
+
+## Interpreting Results in High Dimensions
+
+We need to be careful not to overstate the results obtained, and to make it clear that what we have identified is simply *one of many possible models* for predicting blood pressure, and that it must be further validated on independent data sets. 
+
+# Lab: Linear Models and Regularization Methods
+
+```{r}
+library(tidymodels)
+library(ISLR2)
+
+hitters <- 
+  as_tibble(Hitters) %>% 
+  janitor::clean_names() %>% 
+  filter(!is.na(salary))
+```
+
+## Best Subset Selection
+
+**tidymodels** does not support this. 
+
+## Forward and Backward Stepwise Selection
+
+**tidymodels** does not support this.
+
+## Ridge Regression
+
+We will use the **glmnet** package for this and will need to set `mixture = 0` to specify a ridge model. This argument specifies the amount of different types of regularization. Setting it to 0 specifies only ridge regression and setting it to 1 specifies only lasso regularization. Using a value between 0 and 1 lets us use both. We also need to set a penalty to fit the model. For now, we will use 0. 
+
+```{r}
+ridge_model <- 
+  linear_reg(mixture = 0, penalty = 0) %>% 
+  set_engine("glmnet") %>% 
+  set_mode("regression")
+
+# fit the model with all predictors
+ridge_fit <- fit(ridge_model, salary ~ ., data = hitters)
+tidy(ridge_fit)
+```
+
+How do the estimates change when the penalty is 11,498?
+
+```{r}
+tidy(ridge_fit, penalty = 11498)
+```
+
+The estimates are decreasing when the amount of penalty goes up. We can visualize how the magnitude of the coefficients are being regularized towards zero as the penalty goes up. 
+
+```{r}
+ridge_fit %>% 
+  extract_fit_engine() %>% 
+  plot(xvar = "lambda")
+```
+
+Prediction is done like normal, except that we can set the penalty amount. 
+
+```{r}
+predict(ridge_fit, new_data = hitters)
+
+predict(ridge_fit, new_data = hitters, penalty = 500)
+```
+
+Now we split the data to see estimate the test error. We can also find the "best" penalty value with hyperparameter tuning. 
+
+```{r}
+hitters_split <- initial_split(hitters, strata = "salary")
+
+hitters_train <- training(hitters_split)
+hitters_test <- testing(hitters_split)
+
+hitters_fold <- vfold_cv(hitters_train, v = 10)
+```
+
+We can use `tune_grid()` to perform hyperparameter tuning using a grid search. `tune_grid()` needs 3 things:
+
+* a `workflow` object containing the model and preprocessor
+* a `rset` object containing the resamples the `workflow` should be fitted within, and
+* a tibble containing the parameter values to be evaluated. 
+
+```{r}
+ridge_rec <- 
+  recipe(salary ~ ., data = hitters_train) %>% 
+  step_novel(all_nominal_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
+
+ridge_model <- 
+  linear_reg(penalty = tune(), mixture = 0) %>% 
+  set_engine("glmnet") %>% 
+  set_mode("regression")
+
+ridge_wflow <- 
+  workflow() %>% 
+  add_recipe(ridge_rec) %>% 
+  add_model(ridge_model)
+
+penalty_grid <- grid_regular(penalty(range = c(-5, 5)), levels = 50)
+penalty_grid
+```
+
+Now, we fit all the models:
+
+```{r}
+tune_res <- tune_grid(
+  ridge_wflow,
+  resamples = hitters_fold,
+  grid = penalty_grid
+)
+
+tune_res
+
+autoplot(tune_res)
+
+collect_metrics(tune_res)
+```
+
+We can select the "best" values with `selec_best()`:
+
+```{r}
+best_penalty <- select_best(tune_res, metric = "rsq")
+best_penalty
+```
+
+This value can then be used with `finalize_workflow()` to update/finalize the recipe by replacing `tune()` with the value of `best_penalty`. Then the model is fit with the whole training set. 
+
+```{r}
+ridge_final <- finalize_workflow(ridge_wflow, best_penalty)
+ridge_final_fit <- fit(ridge_final, data = hitters_train)
+tidy(ridge_final_fit)
+
+augment(ridge_final_fit, new_data = hitters_test) %>% 
+  rsq(truth = salary, estimate = .pred)
+```
+
+## The Lasso
+
+```{r}
+lasso_rec <- 
+  recipe(salary ~ ., data = hitters_train) %>% 
+  step_novel(all_nominal_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
+
+lasso_model <- 
+  linear_reg(penalty = tune(), mixture = 1) %>% 
+  set_engine("glmnet") %>% 
+  set_mode("regression")
+
+lasso_wflow <- 
+  workflow() %>% 
+  add_recipe(lasso_rec) %>% 
+  add_model(lasso_model)
+```
+
+With lasso, we still use the `penalty` argument and can tune it. 
+
+```{r}
+penalty_grid <- grid_regular(penalty(range = c(-2, 2)), levels = 50)
+penalty_grid
+```
+
+And then use `tune_grid()` again:
+
+```{r}
+tune_res <- tune_grid(
+  lasso_wflow,
+  resamples = hitters_fold,
+  grid = penalty_grid
+)
+
+autoplot(tune_res)
+
+collect_metrics(tune_res)
+```
+
+Pick the best penalty value and refit the model with the full sample:
+
+```{r}
+best_penalty <- select_best(tune_res, metric = "rsq")
+
+lasso_final <- finalize_workflow(lasso_wflow, best_penalty)
+lasso_final_fit <- fit(lasso_final, data = hitters_train)
+tidy(lasso_fit)
+
+augment(lasso_final_fit, new_data = hitters_test) %>% 
+  rsq(truth = salary, estimate = .pred)
+```
+
+## Principal Components Regression
+
+With **tidymodels** we treat PCA transformations as a preprocessing step. 
+
+```{r}
+lm_model <- 
+  linear_reg() %>% 
+  set_engine("lm") %>% 
+  set_mode("regression")
+
+pca_recipe <- 
+  recipe(salary ~ ., data = hitters_train) %>% 
+  step_novel(all_nominal_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors()) %>% 
+  step_pca(all_predictors(), threshold = tune())
+
+pca_wflow <- 
+  workflow() %>% 
+  add_recipe(pca_recipe) %>% 
+  add_model(lm_model)
+```
+
+We create a smaller grid for `threshold` and we don't need to modify the range since `[0, 1]` is an acceptable range. 
+
+```{r}
+threshold_grid <- grid_regular(threshold(), levels = 10)
+threshold_grid
+
+tune_res <- tune_grid(
+  pca_wflow,
+  resamples = hitters_fold,
+  grid = threshold_grid
+)
+
+autoplot(tune_res)
+```
+
+Select the best model and refit to the whole training dataset. 
+
+```{r}
+best_threshold <- select_best(tune_res, metric = "rmse")
+best_threshold
+
+# fit final model 
+pca_final <- finalize_workflow(pca_wflow, best_threshold)
+pca_final_fit <- fit(pca_final, data = hitters_train)
+
+tidy(pca_final_fit)
+
+augment(pca_final_fit, new_data = hitters_test) %>% 
+  rsq(truth = salary, estimate = .pred)
+```
+
+## Partial Least Squares
+
+Like with PCA, partial least squares calculations are done as a preprocessing step. 
+
+```{r}
+install.packages("mixOmics")
+
+pls_recipe <- 
+  recipe(salary ~ ., data = hitters_train) %>% 
+  step_novel(all_nominal_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors()) %>% 
+  step_pls(all_predictors(), num_comp = tune(), outcome = "salary")
+
+pls_wflow <- 
+  workflow() %>% 
+  add_recipe(pls_recipe) %>% 
+  add_model(lm_model)
+
+num_comp_grid <- grid_regular(num_comp(c(1, 20)), levels = 10)
+
+tine_res <- tune_grid(
+  pls_wflow,
+  resamples = hitters_fold,
+  grid = num_comp_grid
+)
+```
+
+## Compare Models
+
+```{r}
+# Using map() -----------------------------------------------------------------
+models <- list("ridge" = ridge_final_fit,
+               "lasso" = lasso_final_fit,
+               "pca" = pca_final_fit)
+
+model_fits <- map_dfr(models, augment, .id = "model", new_data = hitters_test)
+model_fits
+
+model_fits %>% 
+  group_by(model) %>% 
+  metrics(truth = salary, estimate = .pred) %>% 
+  arrange(.metric) %>% 
+  ggplot(aes(x = reorder(model, .estimate), y = .estimate)) +
+  geom_point(size = 4) + 
+  facet_wrap(~ .metric, nrow = 3, scales = "free")
+
+# using workflow_set() --------------------------------------------------------
+recipies <- list(
+  "ridge" = ridge_rec,
+  "lasso" = lasso_rec,
+  "pca" = pca_recipe
+)
+
+model_wflow <- 
+  workflow_set(preproc = recipies, models = list(lm = lm_model), cross = FALSE)
+model_wflow
+
+# fit models
+model_fits <- 
+  model_wflow %>% 
+  workflow_map("fit_resamples",
+               seed = 1101, 
+               resamples = hitters_fold)
+```
+

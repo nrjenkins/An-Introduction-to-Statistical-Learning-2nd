@@ -1,0 +1,112 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# What is Statistical Learning?
+
+## Why Estimate $f$?
+
+### Prediction
+
+Suppose that $X_1, \dots, X_p$ are characteristics of a patient's blood sample that can be easily measured in a lab, and $Y$ is a variable encoding the patient's risk for a severe adverse reaction to a particular drug. Its natural to seek to predict $Y$ using $X$ since we can then avoid giving the drug in question to patients who are at high risk of an adverse reaction.
+
+The accuracy of $\hat{Y}$ as a prediction for $Y$ depends on two quantities, which we will call the *reducible error* and the *irreducible error*. $\hat{f}$ will not be a perfect estimate for $f$ and this inaccuracy will introduce some error. This error is *reducible* because we can potentially improve the accuracy of F by using the most appropriate statistical learning technique to estimate f.
+
+However, even if we had a perfect estimate for f, we would still have some error because of random variation. This is *irreducible error*. The irreducible error could be larger than zero if there are variables that are useful for predicting $Y$ that we don't include, or it make contain unmeasurable variation.
+
+### Inference
+
+We often want to understand the association between $Y$ and $X_1, \dots, X_p$. In this situation, we want to estimate f, but we don't necessarily care about making predictions for $Y$. Here we need to know the exact form of $\hat{f}$. We might want to answer these questions:
+
+-   Which predictors are associated with the response?
+
+-   What is the relationship between the response and each predictor?
+
+-   Can the relationship between Y and each predictor be adequately summarized using a linear regression, or is the relationship more complicated?
+
+## How Do We Estimate $f$?
+
+### Parametric Methods
+
+Parametric methods involve a two-step model based approach:
+
+1.  Make an assumption about the functional form, or shape, of $f$.
+2.  After a model has been selected, we fit the training data to the model.
+
+If the functional form we use is bad, then the estimates will be bad. We can try using different models, but that may require estimating more parameters which can lead to overfitting.
+
+### Non-parametric Methods
+
+These don't make any assumptions about the functional form. They try to get an estimate that is as close to the data points as possible without being too rough or wiggly. This can greatly improve accuracy. However, because these models do not reduce down to a small number of parameters, they require a large N to get an accurate estimate for $f$. Non-parametric models can be prone to overfitting.
+
+## The Trade-Off Between Prediction Accuracy and Model Interpretability
+
+Restrictive models are much better for inference because it is easier to interpret. With more flexible models, it can be very difficult to understand how any one predictor is associated with the response.
+
+Sometimes less flexible methods are better for prediction because of overfitting.
+
+## Supervised Versus Unsupervised Learning
+
+Supervised models:
+
+-   have a response measurement associated with each predictor measurement
+
+Unsupervised models:
+
+-   no response associated with a predictor measurement
+
+-   We can understand the relationships between the variables or between the observations
+
+As an example, we might observe multiple characteristics of customers and want to know if they fall into different groups such as big spenders versus low spenders. If the information about each customer's spending patterns were available, then we could use supervised methods. Without it, we can try to cluster the customers on the basis of the variables measured to identify distinct groups.
+
+## Regression Versus Classification Problems
+
+# Assessing Model Accuracy
+
+## Measuring the Quality of Fit
+
+-   Mean squared error: small if the predicted responses are close to the true responses, large if not
+
+    -   we want the lowest test MSE
+
+    -   In general, as the model flexibility increases, training MSE will decrease, but the test MSE may not. When we have a small training MSE but a larget test MSE we are overfitting the data.
+
+-   Cross-validation is a method for estimating test MSE using the training data
+
+## The Bias-Variance Trade-Off
+
+The U-shape in test MSE curves is the result of two competing properties of statistical learning methods. The test MSE can be decomposed into the *variance*, the *bias*, and the error terms. To minimize the test error, we need to select a method that has a low variance and low bias.
+
+Variance refers to the amount by which $\hat{f}$ would change if we estimated it using a different training data set. Ideally, it should not vary too much between data sets. More flexible methods tend to have a higher variance.
+
+Bias refers to the error that is introduced by approximating a real-life problem. For example, it's very unlikely that a real-world phenomenon follows a linear form. So, estimating it with a linear form introduces bias. More flexible methods tend to have less bias.
+
+## The Classification Setting
+
+### The Bayes Classifer
+
+$Pr(Y = j|X = x_0)$ is the Bayes classifier. It predicts class one if its probability is greater than 0.5.
+
+### K-Nearest Neighbors
+
+The K-nearest neighbors classifier identifies the K points in the training data that are closest to $x_0$ and then estimates the conditional probability for class J as the fraction of points in N_0 whose respose eqials:
+
+# Lab: Introduction to R
+
+## Applied Exercises
+
+```{r}
+library(ISLR2)
+library(tidyverse)
+
+college_data <- 
+  read_csv("College.csv") %>% 
+  janitor::clean_names()
+
+summary(college_data)
+
+library(GGally)
+
+ggpairs(college_data[ , 2:11])
+```

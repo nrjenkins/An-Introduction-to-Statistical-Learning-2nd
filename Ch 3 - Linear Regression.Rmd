@@ -1,0 +1,337 @@
+---
+title: "Chapter 3: Linear Regression"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+Supposed you were asked to suggest a marketing plan for next year that will result in high product sales. Here are a few important questions we might seek to address:
+
+1.  Is there a relationship between advertising budget and sales?
+2.  How strong is the relationship between advertising budget and sales?
+3.  Which media are associated with sales?
+4.  How large is the association between each medium and sales?
+5.  How accurately can we predict future sales?
+6.  Is the relationship linear?
+7.  Is there synergy among the advertising media?
+
+We can use linear regression to answer all of these.
+
+# Simple Linear Regression
+
+## Estimating the Coefficients
+
+Least squares is commonly used and it minimizes the Residual Sum of Squares (RSS).
+
+## Assessing the Accuracy of the Coefficient Estimates
+
+An unbiased estimator doesn't systematically over- or underestimate the true parameter.
+
+The standard error tells us the average amount that this estimate differs from the actual value of $\mu$.
+
+## Assessing the Accuracy of the Model
+
+Residual standard error (RSE) and R-squared.
+
+### Residual Standard Error
+
+It is the average amount that the response will deviate from the true regression line.
+
+### $R^2$ Statistic
+
+It is the proportion of variance explained.
+
+# Multiple Linear Regression
+
+## Estimating the Regression Coefficients
+
+## Some Important Questions
+
+We use a confidence interval to quantify the uncertianty surrounding the average sales over a large number of cities.
+
+A prediction interval can be used to quantify the uncertianty surrounding sales for a particular city.
+
+# Other Considerations in the Regression Model
+
+# The Marketing Plan
+
+1.  Is there a relationship between advertising budget and sales?
+
+Fit a multiple regression model.
+
+2.  How strong is the relationship between advertising budget and sales?
+
+Need measures of model accuracy. RSE and R-squared.
+
+3.  Which media are associated with sales?
+
+p-values.
+
+4.  How large is the association between each medium and sales?
+
+5.  How accurately can we predict future sales?
+
+We might want a prediction interval or a confidence interval.
+
+6.  Is the relationship linear?
+
+Residual plots
+
+7.  Is there synergy among the advertising media?
+
+interaction terms or polynomial terms.
+
+# Comparison of Linear Regression with K-Nearest Neighbors
+
+# Lab: Linear Regression
+
+# Exercises
+
+## Applied
+
+1.  This question involves the use of simple linear regression on the Auto data set.
+
+-   Use the lm() function to perform a simple linear regression with `mpg` as the response and `horsepower` as the predictor. Use the summary() function to print the results. Comment on the output.
+
+For example:
+
+-   Is there a relationship between the predictor and the re- sponse?
+
+-   How strong is the relationship between the predictor and the response?
+
+-   Is the relationship between the predictor and the response positive or negative?
+
+-   What is the predicted mpg associated with a horsepower of 98? What are the associated 95 % confidence and prediction intervals?
+
+-   Plot the response and the predictor.
+
+-   Produce diagnostic plots of the least squares regression fit.
+
+```{r}
+library(pacman)
+p_load(tidymodels, tidyverse, ISLR2, tidypredict)
+
+# define a training and test set
+auto_split <- initial_split(Auto, prop = 0.8)
+auto_training <- training(auto_split)
+auto_test <- testing(auto_split)
+
+# model fitting ---------------------------------------------------------------
+# specify a model
+lm_model <- 
+  linear_reg() %>% 
+  set_engine("lm")
+
+# specify the recipe
+auto_rec <- 
+  recipe(mpg ~ horsepower, data = auto_training)
+
+# create workflow 
+lm_wflow <- 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(auto_rec)
+
+# fit the workflow
+lm_fit <- fit(lm_wflow, auto_training)
+
+# model results
+tidy(lm_fit)
+
+# model predictions -----------------------------------------------------------
+# using predict
+predict(lm_fit, new_data = tibble("horsepower" = 98))
+
+predict(lm_fit, new_data = tibble("horsepower" = 98), type = "conf_int")
+
+predict(lm_fit, new_data = tibble("horsepower" = 98), type = "pred_int")
+
+# model predictions, interval, and original data
+auto_test %>% 
+  select(mpg) %>% 
+  bind_cols(predict(lm_fit, auto_test)) %>% 
+  bind_cols(predict(lm_fit, auto_test, type = "conf_int")) %>% 
+  slice(1:5)
+
+# using augment
+lm_fit %>% augment(new_data = tibble("horsepower" = 98))
+
+lm_fit %>% 
+  extract_fit_engine() %>% 
+  augment(interval = "confidence", se_fit = TRUE)
+
+lm_fit %>% 
+  extract_fit_engine() %>% 
+  augment(interval = "prediction", se_fit = TRUE)
+
+# plot the response and the predictor -----------------------------------------
+auto_training %>% 
+  ggplot(aes(x = horsepower, y = mpg)) +
+  geom_point()
+
+# diagnostic plots ------------------------------------------------------------
+lm_fit %>% 
+  extract_fit_engine() %>% 
+  plot()
+
+resid_plot <- function(workflow) {
+  workflow %>% 
+    extract_fit_engine() %>% 
+    augment() %>% 
+    ggplot(aes(x = .fitted, y = .resid)) +
+    geom_point() +
+    geom_smooth(se = FALSE)
+}
+
+resid_plot(lm_fit)
+```
+
+2.  This question involves the use of multiple linear regression on the `Auto` data set.
+
+-   Produce a scatterplot matrix which includes all of the variables in the data set.
+
+-   Compute the matrix of correlation between the variables using the function `cor()`.
+
+-   Preform a multiple linear regression with `mpg` as the response and all other variables except `name` as the predictors. Print the results.
+
+-   Produce diagnostic plots of the linear regression fit.
+
+-   Fit the linear regression with interaction effects.
+
+-   Try a few different transformation of the variables.
+
+```{r}
+# scatterplot matrix ----------------------------------------------------------
+library(GGally)
+ggpairs(auto_training %>% select(-name))
+
+# correlations ----------------------------------------------------------------
+auto_cors <- map(auto_training %>% select(-mpg, -name), cor.test, 
+                 y = auto_training$mpg)
+
+auto_cors %>% 
+  map_dfr(tidy, .id = "predictor") %>% 
+  ggplot(aes(x = fct_reorder(predictor, estimate))) +
+  geom_point(aes(y = estimate)) +
+  geom_errorbar(aes(ymin = conf.low, ymax = conf.high), width = 0.1)
+
+# multiple regression ---------------------------------------------------------
+auto_mult_rec <- recipe(mpg ~ ., data = auto_training %>% select(-name))
+
+lm_wflow <- 
+  lm_wflow %>% 
+  update_recipe(auto_mult_rec)
+
+lm_fit <- fit(lm_wflow, data = auto_training)
+
+lm_fit %>% tidy()
+
+# diagnostic plots ------------------------------------------------------------
+resid_plot(lm_fit)
+
+# interaction effects
+auto_mult_rec <- 
+  recipe(mpg ~ ., data = auto_training %>% select(-name)) %>% 
+  step_interact(~ cylinders:weight)
+
+lm_wflow <- 
+  lm_wflow %>% 
+  update_recipe(auto_mult_rec)
+
+lm_fit <- fit(lm_wflow, data = auto_training)
+lm_fit %>% tidy()
+
+tidy_fit <- 
+  lm_fit %>% 
+  tidy()
+  
+ggplot(data = auto_training, aes(x = weight, y = mpg)) +
+   geom_point() +
+   geom_abline(intercept = tidy_fit$estimate[1],
+               slope = c(tidy_fit$estimate[5], sum(tidy_fit$estimate[c(5, 9)])))
+
+# variable transformations ----------------------------------------------------
+auto_mult_rec <- 
+  recipe(mpg ~ ., data = auto_training %>% select(-name)) %>% 
+  step_center(weight) %>%  
+  step_interact(~ cylinders:weight) %>% 
+  step_log(acceleration, base = 10) %>% 
+  step_mutate(cylinders_2 = cylinders^2)
+
+lm_wflow <- 
+  lm_wflow %>% 
+  update_recipe(auto_mult_rec)
+
+lm_fit <- fit(lm_wflow, data = auto_training)
+lm_fit %>% tidy()
+```
+
+3.  This question should be answered using the `Carseats` data set.
+
+-   Fit a multiple regression model to predict `Sales` using `Price`, `Urban`, and `US`.
+
+-   Fit a smaller model that only uses the predictors for which there is evidence of association with the outcome.
+
+-   How well do the models in fit the data.
+
+-   Using the last model, get the 95% confidence interval for the coefficients
+
+```{r}
+carseats_split <- initial_split(Carseats, prop = 0.8)
+carseats_training <- training(carseats_split)
+carseats_testing <- testing(carseats_split)
+
+glimpse(carseats_training)
+
+# First model -----------------------------------------------------------------
+cars_recipie <- 
+  recipe(Sales ~ Price + Urban + US,
+         data = carseats_training) %>% 
+  step_dummy(all_nominal_predictors())
+  
+cars_wflow <- 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(cars_recipie)
+
+cars_fit <- fit(cars_wflow, data = carseats_training)
+
+tidy(cars_fit)
+
+# second model ----------------------------------------------------------------
+cars_small_recipe <- 
+  recipe(Sales ~ Price + US, data = carseats_training) %>% 
+  step_dummy(US)
+
+cars_wflow <- 
+  cars_wflow %>% 
+  update_recipe(cars_small_recipe)
+
+cars_fit2 <- fit(cars_wflow, data = carseats_training)
+
+tidy(cars_fit2)
+
+# model evaluation ------------------------------------------------------------
+glance(cars_fit)
+
+metrics <- metric_set(rmse, rsq, mae)
+
+cars_preds1 <- 
+  cars_fit %>% 
+  predict(new_data = carseats_testing %>% select(-Sales)) %>% 
+  bind_cols(carseats_testing %>% select(Sales))
+
+metrics(cars_preds1, truth = Sales, estimate = .pred)
+
+glance(cars_fit2)
+
+cars_preds2 <- 
+  cars_fit2 %>% 
+  predict(new_data = carseats_testing %>% select(-Sales)) %>% 
+  bind_cols(carseats_testing %>% select(Sales))
+
+metrics(cars_preds2, truth = Sales, estimate = .pred)
+
+# confidence intervals --------------------------------------------------------
+tidy(cars_fit2, conf.int = TRUE)
+```

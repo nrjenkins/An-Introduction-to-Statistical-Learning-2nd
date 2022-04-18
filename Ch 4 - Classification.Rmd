@@ -1,0 +1,514 @@
+---
+title: "Chapter 4: Classification"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+Some widely used classifiers are logistic regression, linear discriminant analysis, quadratic discriminant analysis, naive Bayes, and K-nearest neighbors. 
+
+# An Overview of Classification
+
+```{r}
+library(pacman)
+p_load(tidyverse, ISLR2)
+
+data(Default)
+glimpse(Default)
+
+Default %>% 
+  group_by(default) %>% 
+  sample_n(size = 333) %>% 
+  ggplot(aes(y = income, x = balance, color = default, shape = default)) +
+  geom_point() +
+  theme_classic()
+```
+
+# Why Not Linear Regression?
+
+# Logistic Regression
+
+## The Logistic Model
+
+## Estimating the Regression Coefficients
+
+## Naking Predictions
+
+## Multiple Logistic Regression
+
+```{r}
+Default %>% 
+  group_by(default) %>% 
+  sample_n(size = 333) %>% 
+  ggplot(aes(y = default, x = balance, color = student, shape = student)) +
+  geom_point(position = "jitter") +
+  geom_smooth(method = "lm", position = "dodge") +
+  theme_classic()
+```
+
+## Multinomial Logistic Regression
+
+# Generative Models for Classification
+
+In an alternative approach to logit, we model the distribution of the predictors X separately in each of the response classes. We will discuss three classifiers that use different estimates to approximate the Bayes classifier: linear discriminant analysis, quadratic discriminant analysis, and naive Bayes. 
+
+## Linear Discriminant Analysis for p = 1
+
+The linear discriminant analysis method approximates the Bayes classifier by plugging estimates for $\pi$, $\mu$, and $\sigma^2$ into (4.18). The LDA classifier results from assuming that the observations within each class come from a normal distribution with a class-specific mean and common variance, and plugging estimates for these parameters into the Bayes classifier. 
+
+## Linear Discriminant Analysis for p > 1
+
+To incorporate multiple predictors, we assume that the data are drawn from a multivariate Gaussian distribution. The MVG assumes that each individual predictor follows a one-dimensional normal distribution, as in (4.16), with some correlation between each pair of predictors. 
+
+A binary classifier like LDA can make one of two types of errors: it can incorrectly assign an individual who defaults to the no default category, or it can incorrectly assign an individual who does not default to the default category.  A confusion matrix is a convenient way to display which errors are occurring. 
+
+Sensitivity (true positive) is the percentage of true defaulters that are identified. The specificity (false positive) is the percentage of non-defaulters that are correctly identified. 
+
+We can adjust the sensitivity classifications by changing the threshold posterior probability. Using a threshold of 0.5 minimizes the overall error rate. 
+
+The ROC curve is a popular graphic for simultaneously displaying the two types of errors for all possible thresholds. It means receiver operating characteristics. The overall performance of the classifier, summarized over all possible thresholds, is given by the area under the ROC curve. 
+
+## Quadratic Discriminant Analysis
+
+The QDA classifier results from assuming that the observations from each class are drawn from a Gaussian distribution and plugging estimates for the parameters into Bayes' theorem in order to perform prediction, but QDA assumes each class has its own covariance matrix. QDA is more flexible (it estimates more parameters) and tends to perform better than LDA when the training data is large. 
+
+## Naive Bayes
+
+With naive bayes we assume that within the kth class, the p predictors are independent. The naive Bayes assumption introduces some bias, but reduces variance, leading to a classifier that works quite well in practice as a result of the bias-variance trade-off. 
+
+# A Comparison of Classification Methods
+
+## An Analytical Comparison
+
+We expect LDA to outperform logistic regression when the normality assumption holds, and we expect logistic regression to perform better when it does not. 
+
+K-*nearest neighbors* classifies the training observations that are closest to x then x is assigned to the class to which the plurality of these observations belong. KNN is a non-parametric approach. 
+
+* Because KNN is non-parametric, it will outperform LDA and logistic regression when the decision boundary is highly non-linear, provided that *n* is very large and *p* is small. 
+
+* QDA will outperform KNN when *n* is modest in size or *p* is not very small and the decision boundary is non-linear. QDA requires fewer observations for accurate classification. 
+
+# An Empirical Comparision
+
+# Generalized Linear Models
+
+## Linear Regression on the Bikeshare Data
+
+## Poisson Regression on the Bikeshare Data
+
+## Generalized Linear Model in Greater Generality
+
+# Lab: Classification Methods
+
+## The Stock Market Data
+
+```{r}
+library(pacman)
+p_load(tidyverse, tidymodels, ISLR2, skimr, GGally)
+
+set.seed(1)
+market_split <- initial_time_split(Smarket, prop = 0.9)
+market_training <- training(market_split)
+market_testing <- testing(market_split)
+
+glimpse(market_training)
+skim(market_training)
+
+ggpairs(market_training)
+```
+
+## Logistic Regression
+
+```{r}
+# fit the model ---------------------------------------------------------------
+logit_model <- 
+  logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+market_rec <- 
+  recipe(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, 
+         data = market_training)
+
+market_wflow <- 
+  workflow() %>% 
+  add_model(logit_model) %>% 
+  add_recipe(market_rec)
+
+market_logit_fit <- fit(market_wflow, data = market_training)
+tidy(market_logit_fit)
+
+# predict ---------------------------------------------------------------------
+logit_preds <- predict(market_logit_fit, type = "prob", 
+                       new_data = market_testing)
+head(logit_preds)
+
+logit_preds <- predict(market_logit_fit, type = "class", 
+                       new_data = market_testing)
+head(logit_preds)
+
+augment(market_logit_fit, market_testing) %>% 
+  conf_mat(truth = Direction, estimate = .pred_class) %>% 
+  autoplot()
+
+augment(market_logit_fit, market_testing) %>% 
+  accuracy(truth = Direction, estimate = ".pred_class")
+
+# second model ----------------------------------------------------------------
+market_rec_2 <- 
+  recipe(Direction ~ Lag1 + Lag2, data = market_training)
+
+market_wflow <- 
+  market_wflow %>% 
+  update_recipe(market_rec_2)
+
+market_logit_fit_2 <- fit(market_wflow, data = market_training)
+tidy(market_logit_fit_2)
+
+augment(market_logit_fit_2, market_testing) %>% 
+  accuracy(truth = Direction, estimate = ".pred_class")
+```
+
+We could also fit a model will every combination of predictors to see what gives the best predictive performance. 
+
+```{r}
+# resample the training set
+set.seed(1)
+folds <- vfold_cv(market_training, v = 5)
+
+formulas <- leave_var_out_formulas(Direction ~ ., data = market_training)
+
+market_wflow <- 
+  workflow_set(
+    preproc = formulas,
+    models = list(logistic = logit_model)
+  )
+
+market_fits <- 
+  market_wflow %>% 
+  workflow_map("fit_resamples", resamples = folds)
+market_fits
+
+collect_metrics(market_fits) %>% 
+  filter(.metric == "accuracy")
+```
+
+## Linear Discriminant Analysis
+
+```{r}
+p_load(discrim)
+
+lda_model <- 
+  discrim_linear() %>% 
+  set_engine("MASS") %>% 
+  set_mode("classification")
+
+lda_fit <- 
+  lda_model %>% 
+  fit(Direction ~ Lag1 + Lag2, data = market_training)
+lda_fit
+```
+
+These results show that 48.8% of the training observations correspond to days during which the market went down. It also provides the group means which are the average of each predictor within each class. These suggest that there is a tendency for the previous 2 days' returns to be negative on days when the market increases, and a tendency for the previous days' returns to be positive on days when the market declines. The coefficients of linear discriminants output provides the linear combination of `Lag1` and `Lag2` that are used to form the LDA decision rule. If $-0.746 \times Lag1 - 0.421 \times Lag2$ is large, then the LDA classifier will predict a market increase, and if it is small, then the LDA classifier will predict a market decline. 
+
+```{r}
+augment(lda_fit, new_data = market_testing)
+
+augment(lda_fit, new_data = market_testing) %>% 
+  conf_mat(truth = Direction, estimate = .pred_class)
+
+augment(lda_fit, new_data = market_testing) %>% 
+  accuracy(truth = Direction, estimate = .pred_class)
+```
+
+## Quadratic Discriminant Analysis
+
+```{r}
+qda_model <- 
+  discrim_quad() %>% 
+  set_engine("MASS") %>% 
+  set_mode("classification")
+
+qda_fit <- 
+  qda_model %>% 
+  fit(Direction ~ Lag1 + Lag2, data = market_training)
+qda_fit
+
+augment(qda_fit, new_data = market_testing)
+
+augment(qda_fit, new_data = market_testing) %>% 
+  conf_mat(truth = Direction, estimate = .pred_class)
+
+augment(qda_fit, new_data = market_testing) %>% 
+  accuracy(truth = Direction, estimate = .pred_class)
+```
+
+## Naive Bayes
+
+```{r}
+nb_model <- 
+  naive_Bayes() %>% 
+  set_engine("klaR") %>% 
+  set_mode("classification") %>% 
+  # set usekernel = FALSE to assume all predictors come from a normal distribution
+  set_args(usekernel = FALSE)
+
+nb_fit <- 
+  nb_model %>% 
+  fit(Direction ~ Lag1 + Lag2, data = market_training)
+
+nb_fit
+```
+
+This output shows the estimated mean and standard deviation for each variable in each class. The mean for `Lag1` is 0.05 for `Direction = Down` and the standard deviation is 1.18. 
+
+```{r}
+augment(nb_fit, new_data = market_testing) %>% 
+  conf_mat(truth = Direction, estimate = .pred_class)
+
+augment(nb_fit, new_data = market_testing) %>% 
+  accuracy(truth = Direction, estimate = .pred_class)
+```
+
+## K-Nearest Neighbors
+
+```{r}
+knn_model <- 
+  nearest_neighbor(neighbors = 3) %>% 
+  set_engine("kknn") %>% 
+  set_mode("classification")
+
+knn_fit <- 
+  knn_model %>% 
+  fit(Direction ~ Lag1 + Lag2, data = market_training)
+
+knn_fit
+
+augment(knn_fit, new_data = market_testing) %>% 
+  conf_mat(truth = Direction, estimate = .pred_class)
+
+augment(knn_fit, new_data = market_testing) %>% 
+  accuracy(truth = Direction, estimate = .pred_class)
+```
+
+To see KNN in action with a different dataset, we will use the caravan insurance data:
+
+```{r}
+glimpse(Caravan)
+
+summary(Caravan$Purchase)
+
+caravan_split <- initial_split(Caravan, prop = 0.8)
+caravan_training <- training(caravan_split)
+caravan_testing <- testing(caravan_split)
+
+# baseline error rate
+caravan_training %>% 
+  summarize(purchase = mean(Purchase == "Yes"))
+```
+
+The KNN model predicts the class of an observation by identifying which variables are close to it, so the scale of the variables matters. 
+
+```{r}
+knn_rec <- 
+  recipe(Purchase ~ ., data = caravan_training) %>% 
+  step_normalize(all_numeric_predictors()) %>% 
+
+knn_model <- 
+  nearest_neighbor() %>% 
+  set_engine("kknn") %>% 
+  set_mode("classification")
+
+caravan_wflow <- 
+  workflow() %>% 
+  add_recipe(knn_rec)
+
+knn1_wflow <- 
+  caravan_wflow %>% 
+  add_model(knn_model %>% set_args(neighbors = 1))
+
+knn2_wflow <- 
+  caravan_wflow %>% 
+  add_model(knn_model %>% set_args(neighbors = 3))
+
+knn3_wflow <- 
+  caravan_wflow %>% 
+  add_model(knn_model %>% set_args(neighbors = 5))
+
+# with a loop
+workflows <- vector("list", length = 3)
+neighbors <- c(1, 3, 5)
+
+for (i in 1:3) {
+  workflows[[i]] <- 
+    caravan_wflow %>% 
+    add_model(knn_model %>% set_args(neighbors = neighbors[[i]]))
+}
+
+model_fits <- map(workflows, ~ fit(.x, data = caravan_training))
+
+knn1_fit <- fit(knn1_wflow, data = caravan_training)
+knn2_fit <- fit(knn2_wflow, data = caravan_training)
+knn3_fit <- fit(knn3_wflow, data = caravan_training)
+
+
+augment(knn1_fit, new_data = caravan_testing) %>% 
+  accuracy(truth = Purchase, estimate = .pred_class) %>% 
+  mutate(error_rate = 1 - .estimate)
+
+augment(knn2_fit, new_data = caravan_testing) %>% 
+  accuracy(truth = Purchase, estimate = .pred_class) %>% 
+  mutate(error_rate = 1 - .estimate)
+
+augment(knn3_fit, new_data = caravan_testing) %>% 
+  accuracy(truth = Purchase, estimate = .pred_class) %>% 
+  mutate(error_rate = 1 - .estimate)
+```
+
+
+## Poisson Regression
+
+```{r}
+data("Bikeshare")
+
+bike_data <- Bikeshare
+glimpse(bike_data)
+
+pois_model <- 
+  poisson_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("regression")
+
+bike_rec <- 
+  recipe(bikers ~ mnth + hr + workingday + temp + weathersit,
+         data = bike_data) %>% 
+  step_dummy(all_nominal_predictors())
+
+pois_wflow <- 
+  workflow() %>% 
+  add_model(pois_model) %>% 
+  add_recipe(bike_rec)
+
+pois_fit <- fit(pois_wflow, data = bike_data)
+
+tidy(pois_fit) %>% view()
+
+tidy(pois_fit, conf.int = TRUE) %>% 
+  ggplot(aes(x = estimate, xmin = conf.low, xmax = conf.high, 
+             y = fct_reorder(term, estimate))) +
+  geom_pointrange()
+
+augment(pois_fit, new_data = Bikeshare)
+```
+
+What is the effect of month on riders?
+
+```{r}
+tidy(pois_fit) %>% 
+  filter(str_detect(term, "^mnth")) %>% 
+  mutate(term = str_replace(term, "mnth_", ""),
+         term = fct_inorder(term)) %>% 
+  ggplot(aes(x = term, y = estimate)) +
+  geom_line(group = 1) +
+  geom_point(shape = 21, size = 3, color = "white", fill = "black")
+```
+
+How does it look for time of day?
+
+```{r}
+tidy(pois_fit) %>% 
+  filter(str_detect(term, "^hr")) %>% 
+  mutate(term = str_replace(term, "^hr_X", ""),
+         term = fct_inorder(term)) %>% 
+  ggplot(aes(x = term, y = estimate)) +
+  geom_line(group = 1) +
+  geom_point(shape = 21, size = 3, color = "white", fill = "black")
+```
+
+## Bonus: Comparing Multiple Models
+
+Start by creating a named list of the fitted models you want to evaluate:
+
+```{r}
+models <- list("Logistic Regression" = market_logit_fit_2,
+               "LDA" = lda_fit,
+               "QDA" = qda_fit,
+               "KNN" = knn_fit)
+```
+
+Next use `imap_dfr()` to apply `augment()` to each of the models using the testing data set. `.id = "model"` creates a column named `"model"` that is added to the resulting tibble using the names of the `models`:
+
+```{r}
+preds <- map_dfr(models, augment, new_data = market_testing, .id = "model")
+preds
+
+metrics <- metric_set(accuracy, sensitivity, specificity)
+
+preds %>% 
+  group_by(model) %>% 
+  metrics(truth = Direction, estimate = .pred_class)
+
+# plot the accuracy
+preds %>% 
+  group_by(model) %>% 
+  metrics(truth = Direction, estimate = .pred_class) %>% 
+  filter(.metric == "accuracy") %>% 
+  ggplot(aes(x = .estimate, y = fct_reorder(model, .estimate))) +
+  geom_point()
+
+preds %>% 
+  group_by(model) %>% 
+  roc_curve(Direction, .pred_Down) %>% 
+  autoplot()
+```
+
+
+# Exercises
+
+## Applied
+
+1. Produce some numerical and graphical summaries of the `Weekly` data. Do there appear to be any patterns?
+
+```{r}
+library(pacman)
+p_load(tidyverse, tidymodels, ISLR2)
+
+weekly_data <- 
+  Weekly %>% 
+  select(Year, )
+
+set.seed(1)
+
+weekly_split <- initial_time_split(Weekly, prop = 0.9)
+weekly_train <- training(weekly_split)
+weekly_test <- testing(weekly_split)
+
+glimpse(weekly_train)
+
+weekly_train %>% 
+  group_by(Year) %>% 
+  summarize(Volume = mean(Volume)) %>% 
+  ggplot(aes(x = Year, y = Volume)) +
+  geom_line()
+```
+
+2. Perform a logistic regression with `Direction` as the response and the five lag variables plus `Volume` as predictors. 
+
+```{r}
+logit_model <- 
+  logistic_reg() %>% 
+  set_engine("glm")
+
+weekly_rec <- 
+  recipe(Direction ~ Lag1 + Lag2 + Lag3 + Lag4 + Lag5 + Volume, 
+         data = weekly_train)
+
+weekly_wflow <- 
+  workflow() %>% 
+  add_model(logit_model) %>% 
+  add_recipe(weekly_rec)
+
+weekly_fit <- fit(weekly_wflow, data = weekly_train)
+tidy(weekly_fit)
+```
+
