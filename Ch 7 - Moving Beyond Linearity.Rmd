@@ -1,0 +1,333 @@
+---
+title: 'Chapter 7: Moving Beyond Linearity'
+author: "Nick Jenkins"
+date: '2022-04-18'
+output: html_document
+---
+
+* *Polynomial regression* extends the linear model by adding extra predictors, obtained by raising each of the original predictors to a power.
+
+* *Step functions* cut the range of a variable into *K* distinct regions in order to produce a qualitative variable. This has the effect of fitting a piecewise constant function. 
+
+* *Regression splines* are more flexible than polynomials and step functions, and in fact are an extension of the two. They involve dividing the range of *X* into *K* distinct regions. Within each region, a polynomial function is fit to the data. However, these polynomials arae constrained so that they join smoothly at the region boundaries, or *knots*. With enough regions, this can produce an extremely flexible fit.
+
+* *Smoothing splines* are similar to regression splines, but arise in a slightly different situation. Smoothing splines result from minimizing a residual sum of squares criterion subject to a smoothness penalty.
+
+* *Local regression* is similar to splines, but differs in an important way. The regions are allowed to overlap, and indeed they do in a very smooth way. 
+
+* *Generalized additive models* allow us to extent the methods above to deal with multiple predictors. 
+
+# Polynomial Regression
+
+The traditional way to deal with a nonlinear relationship between predictors and the response is with polynomial terms. 
+
+# Step Functions
+
+Polynomial functions of the features as predictors in a linear model imposes a *global* structure on the non-linear function of *X*. We can instead use *step functions* in order to avoid imposing such a global structure. Here break the range of *X* into *bins*, and fit a different constant in each bin. This amounts to converting a continuous variable into an *ordered categorical variable*. 
+
+Unless there are natural breakpoints in the predictors, piecewise-constant functions can miss the action. 
+
+# Basis Functions
+
+Polynomial and piecewise-constant regression models are special cases of a *basis function* approach. 
+
+# Regression Splines
+
+Now we discuss a flexible class of basis functions.
+
+## Piecewise Polynomials
+
+This involves fitting separate low-degree polynomials over different regions of *X*. In other words, you fit polynomial functions to multiple subsets of the data. 
+
+## Constraints and Splines
+
+We can fit piecewise polynomial functions under the constraint that the fitted curve must be continuous. 
+
+The linear spline is obtained by fitting a line in each region of the predictor space defined by the knots, requiring continuity at each knot. 
+
+## The Spline Basis Representation
+
+Splines have a high variance at the outer range of the predictors - when *X* takes on very small or very large values. A natural spline is a regression spline with additional boundary constraints: the function is required to be linear at the boundary. 
+
+## Choosing the Number and Locations of the Knots
+
+One option is to place more knots in places where we fell the function might vary most rapidly, and to place fewer knots where it seems more stable. Another option is to place knots in a uniform fashion. 
+
+## Comparison to Polynomial Regression
+
+The extra flexibility in the polynomial produces undesirable results at the boundaries, while the natural cubic spline still produces a reasonable fit to the data. Regression splines often work better than polynomial regression because they keep the degree fixed while changing the number of knots. 
+
+# Smoothing Splines
+
+With regression splines, we specify a sequence of knots, produce a sequence of basis functions, and then use least squares to estimate the spline coefficients. But now we discuss a different approach. 
+
+## An Overview of Smoothing Splines
+
+In fitting a smooth curve to a set of data, we want to find a function that fits the observed data well: that is, we want RSS to be small. But, if we don't constrain the function, then we can always make RSS zero simply by choosing a function such that it *interpolates* all of the $y_i$, but this would overfit the data. We want a function that fits the data while also being smooth. 
+
+The smoothing spline is a tuning parameter that adjusts the penalty term. It controls the roughness of the smoothing spline, and hence the *effective degrees of freedom*. 
+
+## Choosing the Smoothing Parameter $\lambda$
+
+A smoothing spline is a natural cubic spline with knots at every unique value of $x_i$. 
+
+# Local Regression
+
+This involves computing the fit at a target point using only the nearby training observations. To obtain the local regression fit at a new point, we need to fit a new weighted least squares regression model by minimizing the equation for a new set of weights. In fitting a local regression, we need to define a weighting function *K*, and whether to fit a linear, constant, or quadratic regression. We also need to choose the span *s*, which is the proportion of points used to compute the local regression at $x_0$. The smaller the value of *s*, the more local and wiggly will be our fit. 
+
+# Generalized Additive Models
+
+GAMs provide a general framework for extending a standard linear model by allowing non-linear functions of each of the variables, while maintaining *additivity*. Just like linear models, GAMs can be applied with both quantitative and qualitative responses. 
+
+## GAMs for Regression Problems
+
+A natural way to extend the multiple linear regression model
+
+$$
+y_i = \beta_0 + \beta_1 x_{i1} + \beta_2 x_{i2} + \dots + |\beta_p x_{ip} + \epsilon_i
+$$
+
+is order to allow for non-linear relationships between each feature and the response is to replace each linear component $\beta_j x_{ij}$ with a (smooth) non-linear function. We would then write the model as:
+
+$$
+\begin{aligned}
+y_1 &= \beta_0 + \sum_{j = 1}^p f_j (x_{ij}) + \epsilon_i \\
+&= \beta_0 f_1(x_{i1}) + f_2(x_{i2}) + \dots + f_p(x_{ip}) + \epsilon_i
+\end{aligned}
+$$
+
+This is an example of a GAM. It is called additive because we calculate a separate $f_j$ for each $X_j$ and then add together all of their contributions. Because these models are additive, we can apply different non-linear functions to each predictor. 
+
+### Pros and Cons of GAMs
+
+Pros: 
+
+* GAMs allow us to fit non-linear functions to each *X* so that we can automatically model non-linear relationships that standard linear regression will miss. This means that we do not need to try out many different transformations on each variable individually. 
+
+* Can make more accurate predictions
+
+* Because the model is additive, we can examine the effect of each *X* on *Y* individually while holding all of the other variables fixed. 
+
+* The smoothness of the function for the variable *X* can be summarized via degrees of freedom
+
+Cons:
+
+* The model is restricted to be additive. With many variables, important interactions can be missed. But we can add interaction terms and interaction functions. 
+
+
+## GAMs for Classification Problems
+
+# Lab: Non-linear Modeling
+
+```{r}
+library(tidymodels)
+library(ISLR2)
+
+wage <- as_tibble(Wage)
+glimpse(wage)
+```
+
+## Polynomial Regression and Step Functions
+
+```{r}
+poly_recipe <- 
+  recipe(wage ~ age, data = wage) %>% 
+  step_poly(age, degree = 4)
+
+lm_model <- 
+  linear_reg() %>% 
+  set_engine("lm") %>% 
+  set_mode("regression")
+
+poly_wflow <- 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(poly_recipe)
+
+poly_fit <- fit(poly_wflow, data = wage)
+tidy(poly_fit)
+```
+
+Now we plot the fit:
+
+```{r}
+poly_fit %>% 
+  extract_fit_engine() %>% 
+  augment(interval = "confidence") %>% 
+  ggplot(aes(x = age_poly_1, y = ..y)) +
+  geom_point(alpha = 0.2) +
+  geom_ribbon(aes(y = .fitted, ymax = .upper, ymin = .lower), alpha = 0.4) +
+  geom_line(aes(y = .fitted), color = "red")
+
+# or
+age_range <- tibble(age = seq(min(wage$age), max(wage$age)))
+
+preds <- bind_cols(
+  augment(poly_fit, new_data = age_range),
+  predict(poly_fit, new_data = age_range, type = "conf_int")
+)
+
+ggplot(data = wage, aes(x = age, y = wage)) +
+  geom_point(alpha = 0.2) +
+  geom_ribbon(data = preds,
+              aes(y = .pred, ymax = .pred_upper, ymin = .pred_lower), alpha = 0.4) +
+  geom_line(data = preds,
+            aes(y = .pred), color = "red")
+```
+
+We can also think of this as a classification problem by changing the task to predicting whether an individual earns more than $250,000 per year. 
+
+```{r}
+wage <- 
+  wage %>% 
+  mutate(high = factor(wage > 250,
+                       levels = c(TRUE, FALSE),
+                       labels = c("High", "Low")))
+
+poly_recipe_2 <- 
+  recipe(high ~ age, data = wage) %>% 
+  step_poly(age, degree = 4)
+
+logit_model <- 
+  logistic_reg() %>% 
+  set_engine("glm") %>% 
+  set_mode("classification")
+
+logit_poly_wflow <- 
+  workflow() %>% 
+  add_model(logit_model) %>% 
+  add_recipe(poly_recipe_2)
+
+logit_fit <- fit(logit_poly_wflow, data = wage)
+
+tidy(logit_fit)
+
+predict(logit_fit, new_data = wage)
+```
+
+We can also visualize the probability curve for the model:
+
+```{r}
+logit_preds <- bind_cols(
+  augment(logit_fit, new_data = age_range, type = "prob"),
+  predict(logit_fit, new_data = age_range, type = "conf_int")
+)
+logit_preds
+
+ggplot(data = logit_preds, aes(x = age)) +
+  geom_ribbon(aes(ymax = .pred_upper_High, ymin = .pred_lower_High), alpha = 0.4) +
+  geom_line(aes(y = .pred_High), color = "red") +
+  coord_cartesian(ylim = c(0, 0.2))
+```
+
+Now let's use a step function. `step_discretize()` will convert a numeric variable into a factor variable with `n` bins, here `n` is specified with `num_breaks`. 
+
+```{r}
+step_recipe <- 
+  recipe(high ~ age, data = wage) %>% 
+  step_discretize(age, num_breaks = 4)
+
+step_wflow <- 
+  workflow() %>% 
+  add_model(logit_model) %>% 
+  add_recipe(step_recipe)
+
+step_fit <- fit(step_wflow, data = wage)
+tidy(step_fit)
+```
+
+If you already know where you want the breaks, you can use `step_cut()`:
+
+```{r}
+cut_recipe <- 
+  recipe(high ~ age, data = wage) %>% 
+  step_cut(age, breaks = c(30, 50, 70))
+
+cut_wflow <- 
+  workflow() %>% 
+  add_model(logit_model) %>% 
+  add_recipe(cut_recipe)
+
+cut_fit <- fit(cut_wflow, data = wage)
+tidy(cut_fit)
+```
+
+## Splines
+
+To use splines, we use `step_bs()` to construct the matrices of basis functions. 
+
+```{r}
+spline_recipe <- 
+  recipe(wage ~ age, data = wage) %>% 
+  step_bs(age, options = list(knots = 25, 40, 60))
+
+spline_wflow <- 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(spline_recipe)
+
+spline_fit <- fit(spline_wflow, data = wage)
+tidy(spline_fit)
+
+spline_preds <- bind_cols(
+  augment(spline_fit, new_data = age_range, type = "prob"),
+  predict(spline_fit, new_data = age_range, type = "conf_int")
+)
+spline_preds
+
+ggplot(data = wage, aes(x = age, y = wage)) +
+  geom_point(alpha = 0.2) +
+  geom_ribbon(data = preds,
+              aes(y = .pred, ymax = .pred_upper, ymin = .pred_lower), alpha = 0.4) +
+  geom_line(data = preds,
+            aes(y = .pred), color = "red")
+```
+
+# GAMs
+
+Now we fit a GAM to predict `wage` using natural spline functions of `year` and `age`, treating `education` as a qualitative predictor. 
+
+```{r}
+gam_recipe <- 
+  recipe(wage ~ year + age + education, data = wage) %>% 
+  step_dummy(education) %>% 
+  step_ns(year, deg_free = 4) %>% 
+  step_ns(age, deg_free = 5)
+
+gam_wflow <- 
+  workflow() %>% 
+  add_model(lm_model) %>% 
+  add_recipe(gam_recipe)
+
+gam_fit <- fit(gam_wflow, data = wage)
+tidy(gam_fit)
+```
+
+Now we fit the model using smoothing splines rather than natural splines. 
+
+```{r}
+library(mgcv)
+
+gam_model <- 
+  gen_additive_mod() %>% 
+  set_engine("mgcv") %>% 
+  set_mode("regression") %>% 
+  fit(wage ~ s(year, k = 4) + s(age, k = 5) + education, data = wage)
+
+gam_model %>% 
+  extract_fit_engine() %>% 
+  summary()
+
+gam_model <- 
+  gen_additive_mod() %>% 
+  set_engine("mgcv") %>% 
+  set_mode("classification") %>% 
+  fit(high ~ s(year, k = 4) + s(age, k = 5) + education, data = wage)
+
+gam_model %>% 
+  extract_fit_engine() %>% 
+  summary()
+
+augment(gam_model, new_data = wage)
+```
+
