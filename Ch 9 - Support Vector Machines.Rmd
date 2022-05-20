@@ -1,0 +1,248 @@
+---
+title: 'Chapter 9: Support Vector Machines'
+author: "Nick Jenkins"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+The support vector machine is a classification approach developed by computer scientists.
+
+# Maximal Margin Classifier
+
+## What is a Hyperplane?
+
+A *hyperplane* is a flat affine subspace of dimension $p-1$. In two dimensions, a hyperplane is a line. Essentially, the hyperplane divides $p$-dimensional space into two halves. One can easily determine on which side of the hyperplane a point lies by simply calculating the sign of the left hand side of $\beta_0 + \beta_1 X_1 + \beta_2 X_2 + \dots + \beta_p X_p = 0$.
+
+## Classification Using a Separating Hyperplane
+
+We can use a hyperplane to separate the training observations according to their class labels. If the sign of the equation is positve, we assign the test observation to class 1, if it is negative we assign it to class -1. The magnitude of the result quantifies our confidence. If the result is far from the hyperplane, we are more confident.
+
+## The Maximal Margin Classifier
+
+If the data can be perfectly separated using a hyperplane, then there will in fact exist an infinite number of hyperplanes. To decide which on to use we can use the maximal margin hyperplane, which is the separating hyperplane that is farthest from the training observations. We compute the distance from each training observation to a given separating hyperplane; the smallest distance is known as the margin. The maximal margin hyperplane is the separating plane for which the margin is largest - the farthest minimum distance to the training observations.
+
+## Construction of the Maximal Margin Classifier
+
+## The Non-separable Case
+
+# Support Vector Classifiers
+
+In many cases no separating hyperplane exists, and so there is no maximal margin classifier. The generalization of the maximial margin classifier to the non-separable case is known as the *support vector classifier*.
+
+## Overview of the Support Vector Classifier
+
+We might want to consider a classifier based on a hyperplane that does not perfectly separate the two classes, in the interest of:
+
+-   greater robustness to individual observations
+
+-   better classification of most of the training observations.
+
+Rather than seeking the largest possible margin so that every observation is not only on the correct side of the hyperplane but also on the correct side of the margin, we instead allow some observations to be on the incorrect side of the margin, or even the incorrect side of the hyperplane.
+
+## Details of the Support Vector Classifier
+
+The support vector classifier classifies a test observation depending on which side of a hyperplane it lies. The hyperplane is chosen to correctly separate most of the training observations into the two classes, but may misclassify a few observations.
+
+Observations that lie directly on the margin, or on the wrong side of the margin for their class, as known as *support vectors*. These observations do affect the support vector classifier.
+
+# Support Vector Machines
+
+## Classification with Non-Linear Decision Boundaries
+
+The support vector classifier is a good choice when the boundary between two classes is linear.
+
+## The Support Vector Machine
+
+The SMV is an extension of the support vector classifier that results from enlarging the feature space in a specific way, using *kernels*. A kernel is a function that quantifies the similarity of two observations.
+
+Training observations that are far from *x* will play essentially no role in the predicted class label for *x*.
+
+We can use support vector machines with polynomial functions or radial kernels.
+
+## An Application to the Heart Disease Data
+
+# SVMs with More than Two Classes
+
+## One-Versus-One Classification
+
+A *one-versus-one* approach constructs SVMs, each of which compares a pair of classes.
+
+## One-Versus-All Classification
+
+The *one-versus-all* approach is an alternative procedure for applying SVMs in the case of K \> 2. We fit K SVMs, each time comparing one of the K classes to the remaining K - 1 classes.
+
+# Relationship to Logistic Regression
+
+The loss function for logistic regression is not exactly zero anywhere, but it is very small for observations that are far from the decision boundary.
+
+When classes are well separated, SVMs tend to behave better than logistic regression; int more overlapping regimes, logistic regression is often preferred.
+
+Support vector regression seeks coefficients that minimize a different type of loss, where only residuals larger in absolute value than some positive constant contribute to the loss function.
+
+# Lab: Support Vector Machines
+
+```{r}
+library(pacman)
+p_load(tidymodels, tidyverse, ISLR2)
+```
+
+## Support Vector Classifier
+
+```{r}
+set.seed(1)
+
+sim_data <- tibble(
+  x1 = rnorm(40),
+  x2 = rnorm(40),
+  y = factor(rep(c(-1, 1), 20))
+) %>% 
+  mutate(x1 = ifelse(y == 1, x1 + 1.5, x1),
+         x2 = ifelse(y == 1, x2 + 1.5, x2))
+
+ggplot(sim_data, aes(x1, x2, color = y)) +
+  geom_point()
+```
+
+We create a linear SVM specification by setting `degree = 1` in a polynomial SVM model. We also set `scaled = FALSE` in `set_engine()` to have the engine scale the data for us.
+
+```{r}
+svm_linear_model <- 
+  svm_linear() %>% 
+  set_mode("classification") %>% 
+  set_engine("kernlab", scaled = FALSE)
+
+svm_linear_fit <- 
+  svm_linear_model %>% 
+  set_args(cost = 10) %>% 
+  fit(y ~ ., data = sim_data)
+
+svm_linear_fit
+
+p_load(kernlab)
+svm_linear_fit %>% 
+  extract_fit_engine() %>% 
+  plot()
+```
+
+What if we use a smaller `cost` parameter?
+
+```{r}
+svm_linear_fit <- 
+  svm_linear_model %>% 
+  set_args(cost = 0.1) %>% 
+  fit(y ~ ., data = sim_data)
+
+svm_linear_fit
+```
+
+With a smaller cost parameter, we get a larger number of support vectors because the margin is now wider.
+
+Let's use `tune_grid()` to find the value of `cost` that leads to the highest accuracy for the SVM model.
+
+```{r}
+svm_linear_wflow <- 
+  workflow() %>% 
+  add_model(svm_linear_model %>% set_args(cost = tune())) %>% 
+  add_formula(y ~ .)
+
+set.seed(1234)
+sim_data_fold <- vfold_cv(sim_data, strata = y)
+
+param_grid <- grid_regular(cost(), levels = 10)
+
+tune_res <- 
+  tune_grid(svm_linear_wflow,
+            resamples = sim_data_fold,
+            grid = param_grid)
+
+autoplot(tune_res)
+```
+
+Now we finalize the workflow:
+
+```{r}
+best_cost <- select_best(tune_res, metric = "accuracy")
+
+svm_linear_final <- finalize_workflow(svm_linear_wflow, best_cost)
+
+svm_linear_fit <- svm_linear_final %>% fit(sim_data)
+
+augment(svm_linear_fit, new_data = sim_data) %>% 
+  conf_mat(truth = y, estimate = .pred_class)
+```
+
+## Support Vector Machine
+
+Now we use a SVM with a non-linear kernel.
+
+```{r}
+set.seed(1)
+sim_data2 <- tibble(
+  x1 = rnorm(200) + rep(c(2, -2, 0), c(100, 50, 50)),
+  x2 = rnorm(200) + rep(c(2, -2, 0), c(100, 50, 50)),
+  y  = factor(rep(c(1, 2), c(150, 50)))
+)
+
+sim_data2 %>%
+  ggplot(aes(x1, x2, color = y)) +
+  geom_point()
+```
+
+We will use an SVM with a radial basis function which will help capture the non-linearity in our data.
+
+```{r}
+svm_rbf_model <- 
+  svm_rbf() %>% 
+  set_mode("classification") %>% 
+  set_engine("kernlab")
+
+svm_rbf_fit <- 
+  svm_rbf_model %>% 
+  fit(y ~ ., data = sim_data2)
+
+svm_rbf_fit %>% 
+  extract_fit_engine() %>% 
+  plot()
+```
+
+## ROC Curves
+
+```{r}
+augment(svm_rbf_fit, new_data = sim_data2) %>% 
+  roc_curve(truth = y, estimate = .pred_1) %>% 
+  autoplot()
+```
+
+A common metric is to calculate the area under this curve:
+
+```{r}
+augment(svm_rbf_fit, new_data = sim_data2) %>% 
+  roc_auc(truth = y, estimate = .pred_1)
+```
+
+## Application to Gene Expression Data
+
+```{r}
+khan_train <- bind_cols(
+  y = factor(Khan$ytrain),
+  as_tibble(Khan$xtrain)
+)
+
+khan_test <- bind_cols(
+  y = factor(Khan$ytest),
+  as_tibble(Khan$xtest)
+)
+
+dim(khan_train)
+
+khan_fit <- 
+  svm_linear_model %>% 
+  set_args(cost = 10) %>% 
+  fit(y ~ ., data = khan_train)
+
+augment(khan_fit, new_data = khan_train) %>% 
+  conf_mat(truth = y, estimate = .pred_class)
+
+augment(khan_fit, new_data = khan_test) %>% 
+  conf_mat(truth = y, estimate = .pred_class)
+```

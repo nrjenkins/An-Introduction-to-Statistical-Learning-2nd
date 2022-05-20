@@ -1,0 +1,384 @@
+---
+title: 'Chapter 8: Tree-Based Methods'
+author: "Nick Jenkins"
+date: '2022-04-22'
+output: html_document
+---
+
+Tree-based methods involve stratifying or segmenting the predictor space into a number of simple regions. In order to make a prediction for a given observation, we typically use the mean of the mode response value for the training observations in the region to which it belongs.
+
+# The Basics of Decision Trees
+
+## Regression Trees
+
+### Predicting Baseball Players' Sa;aries Using Regression Trees
+
+We use the `hitters` data set to predict a baseball player's salary based on years and hits. The regression tree uses a series of splitting rules, starting at the top of the tree. The top split assigns observations having years \< 4.5 to the left branch. The predicted salary for these players is given by the mean response value for the players in the data set with years \< 4.5. Players with years \>= 4.5 are assigned to the right branch, and then that group is further subdivided by hits.
+
+### Prediction via Stratification of the Feature Space
+
+There are two steps in building a regression tree:
+
+1.  We divide the predictor space into *J* distinct and non-overlapping regions
+
+2.  For every observation that falls into the region $R_j$, we make the same prediction, which is simply the mean of the response values for the training observations in $R_j$.
+
+The regions are determined by a top-down, greedy approach that is known as *recursive binary splitting*. The approach is top-down because it begins at the top of the tree and then successively splits the predictor space; each split is indicated via two new branches further down on the tree. It is greedy because at each step of the tree-building process, the *best* split is made at that particular step, rather than looking ahead and picking a split that will lead to a better tree in some future step.
+
+To perform this, we first select the predictor *X* and the cutpoint such that splitting the predictor space into the regions leads to the greatest possible reduction in RSS. The process continues until we reach a stopping point which contains a minimum number of observations.
+
+### Tree Pruning
+
+Trees are prone to adding too much complexity by adding too many regions (too many splits). The best way to combat this is to grow a large tree then prune it back to obtain a *subtree*. We want to select a subtree that leads to the lowest test error rate - which we can minimuze using cross-validation or the validation set approach.
+
+*Cost complexity pruning* - also known as *weakest link pruning* - gives us a way to do just this. Rather than considering every possible subtree, we consider a sequence of trees indexed by a nonnegative tuning parameter. For each value of that parameter, there is a subtree such that error is as small as possible.
+
+*Building a Regression Tree*
+
+1.  Use recursive binary splitting to grow a large tree on the training data, stopping only when each terminal node has fewer than some minimum number of observations.
+
+2.  Apply cost complexity pruning to the large tree in order to obtain a sequence of best subtrees, as a function of $\alpha$.
+
+3.  Use K-fold cross-validation to choose $\alpha$. That is, divide the training observations into K folds. For each fold:
+
+-   Repeat steps 1 and 2 on all but the *k*th fold of the training data.
+
+-   Evaluate the mean squared prediction error on the data in the left-out *k*th fold, as a function of $\alpha$.
+
+Average the results for each value of $\alpha$, and pick $\alpha$ to minimize the average error.
+
+4.  Return the subtree from step 2 that corresponds to the chosen value of $\alpha$.
+
+## Classification Trees
+
+For a classification tree, we predict that each observation belongs to the *most commonly occurring class* of training observations in the region to which it belongs. Instead of using the RSS for making the splits, classification trees use the *classification error rate* which is the proportion of the observations that do not belong to the most common class.
+
+## Trees Versus Linear Models
+
+## Advantages and Disadvantages of Trees
+
+# Bagging, Random Forests, Boosting, and Bayesian Additive Regression Trees
+
+## Bagging
+
+Bootstrap aggregation, or bagging, is a general-purpose procedure for reducing the variance of a statistical learning method. The natural way to reduce the variance and increase the test set accuracy of a statistical learning method is to take many training sets from the population, build a separate prediction model using each training set, and average the resulting predictions. We can't do this, but we can bootstap by taking repeated samples from the (single) training data set. We generate B different bootstrapped training data sets and average all the predictions. This is called bagging.
+
+To apply bagging to regression trees, we construct B regression trees using B bootstrapped training sets, and average the resulting predictions. These trees are deep and not pruned so they have a low bias but high variance. Averaging the trees reduces the variance. For classification models, we take the majority vote of the model classifications which is the prediction that is most commonly occurring class among the B predictions.
+
+### Out-of-Bag Error Estimation
+
+### Variable Importance Measures
+
+Baging improves prediction at the expense of interpretability. For bagging regression trees, we can record the total amount that the RSS is decreased due to splits over a given predictor, averaged over all B trees. A large value indicates an important predictor.
+
+## Random Forests
+
+Random forests provide an improvement over bagged trees by way of a small tweak that decorrelates the trees. We build a number of decision trees on bootstrapped training samples. Each time a split in a tree is considered, a random sample of m predictors is chosen as split candidates from the full set of p predictors. The split is allowed to use only one of those m predictors. A fresh sample of m predictors is taken at each split, and typically we choose m such that the number of predictors considered at each split is approximately equal to the square root of the total number of predictors.
+
+In building a random forest, at each split in the tree, the algorithm is not even allowed to consider a majority of the available predictors.
+
+The biggest difference between bagging and random forests is the choice of predictor subset size *m*. If a random forest is built using $m = p$, then this amounts simply to bagging. Random forests using $m = \sqrt{p}$ can lead to a reduction in both test error and OOB error over bagging.
+
+Using a small value of *m* in building a random forest will typically be helpful when we have a large number of correlated predictors.
+
+## Boosting
+
+Like bagging, boosting is a general approach that can be applied to many statistical learning methods for regression or classification. Bagging involves creating multiple copies of the original training data set using the bootstrap, fitting a separate decision tree to each copy, and then combining all of the trees in order to create a single predictive model. Boosting works in a similar way except that the trees are grown *sequentially*: each tree is grown using information from previously grown trees. Boosting does not involve bootstrap sampling; instead each tree is fit on a modified version of the original data set.
+
+Unlike fitting a single large decision tree to the data, the boosting approach learns slowly. Given the current model, we fit a decision tree to the residuals from the model. We then add this new decision tree into the fitted function in order to update the residuals. By fitting small trees to the residuals, we slowly improve the model in areas where it does not perform well.
+
+Boosting has three parameters:
+
+1.  The number of trees.
+
+2.  The shrinkage parameter. This controls the rate at which boosting learns.
+
+3.  The number of splits in each tree. This controls the complexity of the boosted ensemble.
+
+## Bayesian Additive Regression Trees
+
+BART is another ensemble method that uses decision trees as its building blocks. Bagging and random forests make predictions from an average of regression trees, each of which is built using a random sample of data and/or predictors and each is built separately from the others. By contrast, boosting uses a weighted sum of trees, each of which is constructed by fitting a tree to the residual of the current fit.
+
+BART is related to both approaches: each tree is constructed in a random manner as in bagging and random forests, and each tree tries to capture signal not yet accounted for by the current model, as in boosting.
+
+## Summary of Tree Ensemble Methods
+
+-   In *bagging*, the trees are grown independently on random sample of the observations. Consequently, the trees tend to be quite similar to each other. Thus, bagging can get caught in local optima and can fail to thoroughly explore the model space.
+
+-   In *random forests*, the trees are once again grown independently on random samples of the observations. However each split on each tree is performed using a random subset of the features, thereby decorrelating the trees, and leading to a more thorough exploration of model space relative to bagging.
+
+-   In *boosting*, we only use the original data, and do not draw any random samples. The trees are grown successively, using a "slow" learning approach: each new tree is fit to the signal that is left over from the earlier trees, and shrunken down before it is used.
+
+-   In *BART*, we once again only make use of the original data, and we grow the trees successively. However, each tree is perturbed in order to avoid local minima and achieve a more thorough exploration of the model space.
+
+# Lab: Decision Trees
+
+```{r}
+library(pacman)
+p_load(tidyverse, tidymodels, ISLR2, rpart.plot, vip)
+
+data("Boston", package = "MASS")
+
+boston <- as_tibble(Boston)
+
+carseats <- as_tibble(Carseats) %>% 
+  janitor::clean_names() %>% 
+  mutate(high = factor(if_else(sales <= 8, "No", "Yes"))) %>% 
+  select(-sales)
+```
+
+## Fitting Classification Trees
+
+```{r}
+tree_model <- 
+  decision_tree() %>% 
+  set_engine("rpart")
+
+class_tree_model <- 
+  tree_model %>% 
+  set_mode("classification")
+
+class_tree_fit <- 
+  class_tree_model %>% 
+  fit(high ~ ., data = carseats)
+
+class_tree_fit
+
+class_tree_fit %>% 
+  extract_fit_engine() %>% 
+  rpart.plot()
+
+augment(class_tree_fit, new_data = carseats) %>% 
+  accuracy(truth = high, estimate = .pred_class)
+```
+
+The training accuracy of this model is 85%. We can also look at the confusion matrix:
+
+```{r}
+augment(class_tree_fit, new_data = carseats) %>% 
+  conf_mat(truth = high, estimate = .pred_class)
+```
+
+Now we repeat the analysis this time fitting the model on a validation split.
+
+```{r}
+set.seed(1234)
+carseats_split <- initial_split(carseats)
+
+carseats_train <- training(carseats_split)
+carseats_test <- testing(carseats_split)
+```
+
+Now we fit the model on the training set:
+
+```{r}
+class_tree_fit <- fit(class_tree_model, high ~ ., data = carseats_train)
+
+augment(class_tree_fit, new_data = carseats_train) %>% 
+  conf_mat(truth = high, estimate = .pred_class)
+
+augment(class_tree_fit, new_data = carseats_test) %>% 
+  conf_mat(truth = high, estimate = .pred_class)
+
+augment(class_tree_fit, new_data = carseats_test) %>% 
+  accuracy(truth = high, estimate = .pred_class)
+```
+
+Let's tune the `cost_complexity` of the decision tree to find a more optimal complexity:
+
+```{r}
+class_tree_wflow <- 
+  workflow() %>% 
+  add_model(class_tree_model %>% set_args(cost_complexity = tune())) %>% 
+  add_formula(high ~ .)
+
+set.seed(1234)
+
+carseats_fold <- vfold_cv(carseats_train)
+
+param_grid <- grid_regular(cost_complexity(range = c(-3, -1)), levels = 10)
+
+tune_res <- 
+  tune_grid(class_tree_wflow,
+            resamples = carseats_fold,
+            grid = param_grid,
+            metrics = metric_set(accuracy))
+
+autoplot(tune_res)
+```
+
+We can now select the best performing value with `select_best()`, finalize the workflow by updating the value of `cost_complexity` and fit the model on the full training data set.
+
+```{r}
+best_complexity <- select_best(tune_res)
+
+class_tree_final <- finalize_workflow(class_tree_wflow, parameters = best_complexity)
+
+class_tree_final_fit <- fit(class_tree_final, data = carseats_train)
+class_tree_final_fit
+
+class_tree_final_fit %>% 
+  extract_fit_engine() %>% 
+  rpart.plot()
+```
+
+## Fitting Regression Trees
+
+The main difference from above is that here we use a continuous variable instead of a categorical variable for the outcome.
+
+```{r}
+reg_tree_model <- 
+  tree_model %>% 
+  set_mode("regression")
+
+set.seed(1234)
+boston_split <- initial_split(boston)
+
+boston_train <- training(boston_split)
+boston_test <- testing(boston_split)
+
+reg_tree_fit <- fit(reg_tree_model, medv ~ ., boston_train)
+reg_tree_fit
+
+augment(reg_tree_fit, new_data = boston_test) %>% 
+  rmse(truth = medv, estimate = .pred)
+
+reg_tree_fit %>% 
+  extract_fit_engine() %>% 
+  rpart.plot()
+```
+
+Now we tune the `cost_complexity`:
+
+```{r}
+reg_tree_wflow <- 
+  workflow() %>% 
+  add_model(reg_tree_model %>% set_args(cost_complexity = tune())) %>% 
+  add_formula(medv ~ .)
+
+set.seed(1234)
+boston_fold <- vfold_cv(boston_train)
+
+param_grid <- grid_regular(cost_complexity(range = c(-4, -1)), levels = 10)
+
+tune_res <- 
+  tune_grid(reg_tree_wflow,
+            resamples = boston_fold,
+            grid = param_grid)
+
+autoplot(tune_res)
+```
+
+We select the best model according to `rmse` and fit the final model on the whole training data set.
+
+```{r}
+best_complexity <- select_best(tune_res, metric = "rmse")
+
+reg_tree_final <- finalize_workflow(reg_tree_wflow, best_complexity)
+
+reg_tree_final_fit <- fit(reg_tree_final, data = boston_train)
+reg_tree_final_fit
+
+reg_tree_final_fit %>% 
+  extract_fit_engine() %>% 
+  rpart.plot()
+
+augment(reg_tree_final_fit, new_data = boston_test) %>% 
+  rmse(truth = medv, estimate = .pred)
+```
+
+The `rmse` shows that this model leads to predictions that are within \$4,570 of the true median home price for the census tract.
+
+## Bagging and Random Forests
+
+A bagging model is the same as a random forest where `mtry` is equal to the number of predictors.
+
+```{r}
+bagging_model <- 
+  rand_forest(mtry = .cols()) %>% 
+  set_engine("randomForest", importance = TRUE) %>% 
+  set_mode("regression")
+
+bagging_fit <- fit(bagging_model, medv ~ ., data = boston_train)
+
+augment(bagging_fit, new_data = boston_test) %>% 
+  rmse(truth = medv, estimate = .pred)
+
+augment(bagging_fit, new_data = boston_test) %>% 
+  ggplot(aes(x = medv, .pred)) +
+  geom_abline() +
+  geom_point(alpha = 0.5)
+```
+
+We can also look at variable importance:
+
+```{r}
+vip(bagging_fit)
+```
+
+Now we fit a random forest.
+
+```{r}
+rf_model <- rand_forest(mtry = 6) %>% 
+  set_engine("randomForest", importance = TRUE) %>% 
+  set_mode("regression")
+
+rf_fit <- fit(rf_model, medv ~ ., data = boston_train)
+
+augment(rf_fit, new_data = boston_test) %>% 
+  rmse(truth = medv, estimate = .pred)
+
+augment(rf_fit, new_data = boston_test) %>% 
+  ggplot(aes(x = medv, .pred)) +
+  geom_abline() +
+  geom_point(alpha = 0.5)
+
+vip(rf_fit)
+
+# rf with tuning
+rf_model <- rand_forest(mtry = tune()) %>% 
+  set_engine("randomForest", importance = TRUE) %>% 
+  set_mode("regression")
+
+rf_wflow <- 
+  workflow() %>% 
+  add_model(rf_model) %>% 
+  add_formula(medv ~ .)
+
+set.seed(1234)
+
+boston_fold <- vfold_cv(boston_train)
+
+param_grid <- grid_regular(mtry(range = c(1, 13)))
+
+tune_res <- 
+  tune_grid(rf_wflow,
+            resamples = boston_fold,
+            grid = param_grid,
+            metrics = metric_set(rmse))
+
+autoplot(tune_res)
+
+mtry_best <- select_best(tune_res, metric = "rmse")
+
+rf_final <- finalize_workflow(rf_wflow, mtry_best)
+
+rf_final_fit <- fit(rf_final, data = boston_train)
+rf_final_fit
+
+augment(rf_final_fit, new_data = boston_test) %>% 
+  rmse(truth = medv, estimate = .pred)
+```
+
+## Boosting
+
+```{r}
+boost_model <- boost_tree(trees = 5000, tree_depth = 4) %>% 
+  set_engine("xgboost") %>% 
+  set_mode("regression")
+
+boost_fit <- fit(boost_model, medv ~ ., data = boston_train)
+
+augment(boost_fit, new_data = boston_test) %>% 
+  rmse(truth = medv, estimate = .pred)
+```

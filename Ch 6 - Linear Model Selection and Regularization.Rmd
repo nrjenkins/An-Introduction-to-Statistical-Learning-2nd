@@ -69,11 +69,11 @@ One disadvantage of ridge regression is that the final model will include all pr
 
 In general, lasso will perform better when a relatively small number of predictors have substantial coefficients, and the remaining predictors have coefficients that are very small or that equal zero. Ridge regression will perform better when the response is a function of many predictors, all with coefficients of roughly equal size. 
 
-In ridge regression, each least squares coefficient estimate is shurnken by the same proportion. In contrast, the lasso shrinks each least squares coefficient towards zero by a constant amount. 
+In ridge regression, each least squares coefficient estimate is shrunken by the same proportion. In contrast, the lasso shrinks each least squares coefficient towards zero by a constant amount. 
 
 ## Selecting the Tuning Parameter
 
-Implementing ridge and lasso regression requires selecint a value for the tuning parameter $\lambda$. Cross-validation provides a simple way to tackle this problem. We choose a grid of $\lambda$ values, and compute the cross-validation error for each value of $\lambda$. When then pick the tuning parameter that makes the cross-validation error the smallest. 
+Implementing ridge and lasso regression requires selecting a value for the tuning parameter $\lambda$. Cross-validation provides a simple way to tackle this problem. We choose a grid of $\lambda$ values, and compute the cross-validation error for each value of $\lambda$. When then pick the tuning parameter that makes the cross-validation error the smallest. 
 
 # Dimension Reduction Methods
 

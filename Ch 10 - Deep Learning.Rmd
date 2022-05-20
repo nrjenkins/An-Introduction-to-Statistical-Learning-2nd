@@ -1,0 +1,184 @@
+---
+title: 'Chapter 10: Deep Learning'
+author: "Nick Jenkins"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+The cornerstone of deep learning is the *neural network*.
+
+# Single Layer Neural Networks
+
+A neural network takes an input vector of *p* variables and builds a nonlinear function to predict the response *Y*.
+
+What distinguishes neural networks from other nonlinear methods is the structure of the model. The features of the model make up the units in the *input layer*. Each of the inputs from the input layer feeds into each of the K *hidden units*. The neural network model is built in two steps:
+
+1.  The K *activations* in the hidden layer are computed as functions of the input features.
+2.  These K activations from the hidden layer then feed into the putput layer, resulting in a linear regression model in the K activations.
+
+The model uses the input layer to derive new features which makeup the hidden layer and then an activation (link) function is used to transform it. The nonlinearity in the activation function is essential, since without it the model would collapse into a simple linear model. Moreover, having a nonlinear activation function allows the model to capture complex nonlinearities and interaction effects.
+
+# Multilayer Neural Networks
+
+In theory, a single hidden layer with a large number of units has the ability to approximate must functions.
+
+# Convolutional Neural Networks
+
+CNNs classify images by identifying local features and combining them to create compound features. The compound features are used to label the outputs. It builds the hierarchy by combining two special types of hidden layers, called *convolution* layers and *pooling* layers. Convolution layers search for instances of small patterns in the image, whereas pooling layers downsample these to select a prominent subset.
+
+## Convolution Layers 
+
+A *convolution layer* is made up of a large number of *convolution filters*, each of which is a template that determines whether a particular local feature is present in an image. A convolution filter relies on a very simple operation called a convolution, which basically amounts to repeatedly multiplying matrix elements and then adding the results.
+
+## Pooling Layers
+
+A *pooling* layer provides a way to condense a large image into a smaller summary image.
+
+## Architecture of a Convolutional Neural Network
+
+In a single convolution layer each filter produces a new two-dimensional feature map. The pooling layer reduces the first two dimensions of each three-dimensional feature map. Deep CNNs have many such layers.
+
+## Data Augmentation
+
+Images are replicated and distorted in such a way that human recognition is unaffected.
+
+## Results Using a Pretrained Classifier
+
+# Document Classification
+
+WIth textual data, we need to find a way to featurize the data which means find predictors. The simplest and most common featurization is the *bag-of-words* model. We score each document for the presence or absence of each of the words in a language dictionary. If the dictionary contains M words, that means for each document we create a binary feature vector of length M, and score a 1 for every word present, and 0 otherwise.
+
+The bag-of-words model summarizes a document by words present, and ignores context. There are two popular ways to take the context into account:
+
+-   The *bag-of-n-grams* mode. For example, a bag of 2-grams records the consecutive co-occurrence of every distinct pair of words. "Blissfully long" can be seen as a positive phrase, while "blissfully short" negative.
+
+-   Treat the document as a sequence, taking account of all the words in the context of those that preceded and those that follow.
+
+# Recurrent Neural Networks
+
+In a RNN the input object X is a *sequence*.
+
+## Sequential Models for Document Classification
+
+## Time Series Forecasting
+
+### RNN Forecaster
+
+### Autoregression
+
+## Summary of RNNs
+
+# When to Use Deep Learning
+
+Deep learning is a good choice when the sample size of the training set is extremely large, and when interpretability of the model is not a high priority.
+
+# Fitting a Neural Network
+
+## Backpropagation
+
+## Regularization and Stochastic Gradient Descent
+
+## Dropout Learning
+
+## Network Tuning
+
+# Interpolation and Double Descent
+
+Double descent is when a statistical learning method that interpolates the training data (achieves a zero training error) outperforms than a slightly less complex model that does not interpolate the data.
+
+# Lab: Deep Learning
+
+## A Single Layer Network on the Hitters Data
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(ISLR2)
+
+hitters <- 
+  as_tibble(Hitters) %>% 
+  janitor::clean_names() %>% 
+  filter(!is.na(salary))
+
+set.seed(13)
+hitters_split <- initial_split(hitters, strata = "salary")
+hitters_train <- training(hitters_split)
+hitters_test <- testing(hitters_split)
+hitters_fold <- vfold_cv(hitters_train, v = 10)
+```
+
+First we fit the linear model:
+
+```{r}
+linear_model <- 
+  linear_reg() %>% 
+  set_mode("regression")
+
+linear_fit <- 
+  linear_model %>% 
+  fit(salary ~ ., data = hitters_train)
+tidy(linear_fit)
+
+augment(linear_fit, new_data = hitters_test) %>% 
+  mape(truth = salary, estimate = .pred)
+```
+
+Next we fit the lasso:
+
+```{r}
+lasso_rec <- 
+  recipe(salary ~ ., data = hitters_train) %>% 
+  step_novel(all_nominal_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>% 
+  step_zv(all_predictors()) %>% 
+  step_normalize(all_predictors())
+
+lasso_model <- 
+  linear_reg(penalty = tune(), mixture = 1) %>% 
+  set_engine("glmnet") %>% 
+  set_mode("regression")
+
+lasso_wflow <- 
+  workflow() %>% 
+  add_recipe(lasso_rec) %>% 
+  add_model(lasso_model)
+
+penalty_grid <- grid_regular(penalty(range = c(-2, 2)), levels = 50)
+penalty_grid
+
+tune_res <- tune_grid(
+  lasso_wflow,
+  resamples = hitters_fold,
+  grid = penalty_grid
+)
+
+autoplot(tune_res)
+
+best_penalty <- select_best(tune_res, metric = "rsq")
+
+lasso_final <- finalize_workflow(lasso_wflow, best_penalty)
+
+lasso_final_fit <- fit(lasso_final, data = hitters_train)
+
+augment(lasso_final_fit, new_data = hitters_test) %>% 
+  mape(truth = salary, estimate = .pred)
+```
+
+Now we fit the neural network.
+
+```{r}
+neural_net_model <- 
+  mlp(hidden_units = 50, dropout = 0.4, epochs = 1500,
+      mode = "regression") %>% 
+  set_engine("keras")
+
+linear_recipe <- 
+  recipe(salary ~ ., data = hitters_train) %>% 
+  step_dummy(all_nominal_predictors())
+
+snn_fit <- 
+  neural_net_model %>% 
+  fit(salary ~ ., data = hitters_train)
+```
+
+\
