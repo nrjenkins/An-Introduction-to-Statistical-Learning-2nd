@@ -1,0 +1,486 @@
+---
+title: 'Chapter 12: Unsupervised Learning'
+author: "Nick Jenkins"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+With unsupervised learning, we aren't focused on prediction because we don't have an associated response variable. Instead, the goal is to discover interesting things about the measurements of the features. 
+
+* Is there an informative way to visualize the data? 
+* Can we discover subgroups among the variables or among the observations. 
+
+Unsupervised learning refers to a diverse set of techniques for answering questions such as these.
+
+# The Challenge of Unsupervised Learning
+
+Unsupervised learning is often performed as part of an *exploratory data analysis*. It can also be hard to assess the results obtained from unsupervised learning methods, since there is no universally accepted mechanism for performing cross-validation or validating results on an independent data set. 
+
+# Principal Components Analysis
+
+*Principal components* were discussed in the context of principal components regression. When faced with a large set of correlated variables, principal components allow us to summarize this set with a smaller number of representative variables that collectively explain most of the variability in the original set. 
+
+*Principal components analysis* refers to the process by which principal components are computed and the subsequent use of these components in understanding the data. 
+
+## What Are Principal Components?
+
+PCA provides a tool to find a low-dimensional representation of a data set that contains as much as possible of the variation. PCA seeks a small number of dimensions that are as interesting as possible, where the concept of *interesting* is measured by the amount that the observations cary along each dimension. 
+
+The *first principal component* of a set of features is the normalized linear combination of the features that has the largest variance. The second principal component is the linear combination that has maximal variance out of all linear combinations that are uncorrelated with Z. 
+
+## Another Interpretation of Principal Components
+
+Instead of thinking about the principal component loading vectors as the directions in feature space along which data vary the most, and the principal component scores as projections along these directions, we can think of principal components as providing low-dimensional linear surfaces that are *closest* to the observations. 
+
+## The Proportion of Variance Explained
+
+## More on PCA
+
+### Scaling the Variables
+
+Because it is undesirable for the principal components obtained to depend on an arbitrary choice of scaling, we typically scale each variable to have standard deviation one before we perform PCA. 
+
+### Uniqueness of the Principal Components
+
+### Deciding How Many Principal Components to Use
+
+We want to use the smallest number of principal components required to get a good understanding of the data. 
+
+## Other Uses for Principal Components
+
+# Missing Values and Matrix Completion
+
+Matrix completion can be used to impute the missing values. 
+
+### Principal Components with missing Values
+
+### Recommender Systems
+
+# Clustering Methods
+
+Clustering refers to a very broad set of techniques for finding subgroups, or clusters, in a data set. When we cluster the observations of a data set, we seek to partition them into distinct groups so that the observations in different groups are quite similar to each other. 
+
+Clustering and PCA seek to simplify the data via a small number of summaries, but their mechanisms are different:
+
+* PCA looks to find a low-dimensional representation of the observations that explain a good fraction of the variance
+* Clustering looks to find homogeneous subgroups among the observations
+
+Two of the best clustering approaches are K-means and hierarchical clustering. With K-means clustering, we seek to partition the observations into a pre-specified number of clusters. With hierarchical clustering, we do not know in advance how many clusters we want; in fact, we end up with a tree-like visual representation of the observations called a *dendrogram*. 
+
+We can cluster observations on the basis of the features in order to identify subgroups among the observations, or we can cluster features on the basis of the observations in order to discover subgroups among the features. 
+
+## K-Means Clustering
+
+To perform K-means clustering, we first specify the desired number of clusters K; then the algorithm will assign each observation to exactly one of the K clusters. 
+
+The algorithm works in two steps:
+
+1. Randomly assign a number, from 1 to K, to each of the observations. These serve as initial cluster assignments for the observations.
+
+2. Iterate until the clusting assignment stop changing:
+
+  * For each of the K clusters, compute the cluster *centroid*. The kth cluster centroid is the vector of the *p* feature means for the observations in the kth cluster. 
+  * Assign each observation to the cluster whose centroid is closest. 
+  
+## Hierarchical Clustering
+
+### Interpreting a Dendrogram
+
+### The Hierarchical Clustering Algorithm
+
+The algorithm works in two steps:
+
+1. Begin with n observations and a measure of all the pairwise dissimilarities. Treat each observation as its own cluster. 
+
+2. For $i = n, n-1, \dots, 2$: 
+
+  * Examine all pairwise inter-cluster dissimilarities among the *i* clusters and identify the pair of clusters that are least dissimilar. Fuse these two clusters. The dissimilarity between these two clusters indicates the height in the dendrogram at which the fusion should be placed. 
+  * Compute the new pairwise inter-cluster dissimilarities among the $i - 1$ remaining clusters. 
+  
+### Choice of Dissimilarity Measure
+
+Some options are Euclidean distance and correlation-based distance. 
+
+## Practical Issues in Clustering
+
+### Small Decisions with Big Consequences
+
+* Should the observations or features first be standardized in some way?
+
+* In the case of hierarchial clustering:
+
+  - What dissimilarity measure should be used?
+  - What type of linkage should be used?
+  - Where should we cut the dendrogram in order to obtain clusters?
+  
+* In the case of K-means clustering, how many clusters should we look for in the data?
+
+### Validating the Clusters Obtained
+
+### Other Considerations in Clustering
+
+### A Tempered Approach to Interpreting the Results of Clustering
+
+# Lsb: Unsupervised Learning
+
+## Principal Components Analysis
+
+```{r}
+library(pacman)
+p_load(tidymodels, tidyverse, factoextra, patchwork, proxy, ISLR2)
+
+usa_arrests <- as_tibble(USArrests, rownames = "state")
+glimpse(usa_arrests)
+```
+
+The means of each variable are very different:
+
+```{r}
+usa_arrests %>% 
+  select(-state) %>% 
+  map_df(mean)
+```
+
+We will perform PCA in two different ways. First useing `prcomp()` directly. 
+
+```{r}
+usa_arrests_pca <- 
+  usa_arrests %>% 
+  select(-state) %>% 
+  prcomp(scale = TRUE)
+
+tidy(usa_arrests_pca)
+```
+
+We can get the PCA scores like this:
+
+```{r}
+tidy(usa_arrests_pca, matrix = "scores")
+```
+
+And the PCA loadings like this:
+
+```{r}
+tidy(usa_arrests_pca, matrix = "loadings")
+```
+
+This information tells you how much each variable contributes to each principal component. 
+
+```{r}
+tidy(usa_arrests_pca, matrix = "loadings") %>% 
+  ggplot(aes(x = value, y = column)) +
+  facet_wrap(~ PC) +
+  geom_col()
+```
+
+With recipes, it is important to normalize the data to ensure they are all on the same scale. 
+
+```{r}
+pca_rec <- 
+  recipe(~ ., data = usa_arrests) %>% 
+  step_normalize(all_numeric()) %>% 
+  step_pca(all_numeric(), id = "pca") %>% 
+  prep()
+```
+
+By calling `bake(new_data = NULL)` we can get the fitted PC transformation of our numerical variables
+
+```{r}
+pca_rec %>% bake(new_data = NULL)
+```
+
+We can also use `tidy()` with the recipe. `type = "coef"` gives use the scores. 
+
+```{r}
+tidy(pca_rec, id = "pca", type = "coef")
+```
+
+## K-Means Clustering
+
+```{r}
+set.seed(2)
+
+x_df <- tibble(
+  V1 = rnorm(n = 50, mean = rep(c(0, 3), each = 25)),
+  V2 = rnorm(n = 50, mean = rep(c(0, -4), each = 25))
+)
+
+x_df %>% 
+  ggplot(aes(V1, V2, color = rep(c("A", "B"), each = 25))) +
+  geom_point()
+```
+
+The `kmeans()` function takes a data frame and centers which is the number of clusters we want to find. 
+
+```{r}
+set.seed(1234)
+res_kmeans <- kmeans(x_df, centers = 3, nstart = 20)
+
+tidy(res_kmeans)
+```
+
+With `glance()` we can see the total within-cluster-sum-of-squares that we want to minimize when we perform K-means clustering.
+
+```{r}
+glance(res_kmeans)
+```
+
+Finally, we can use `augment()` and visualize the results:
+
+```{r}
+augment(res_kmeans, data = x_df) %>% 
+  ggplot(aes(V1, V2, color = .cluster)) +
+  geom_point()
+```
+
+To try multiple clusters, and find the best, we use `map()` to fit multiple models and extract information from them. 
+
+```{r}
+set.seed(1234)
+multi_kmeans <- tibble(k = 1:10) %>% 
+  mutate(model = map(k, ~ kmeans(x_df, centers = .x, nstart = 20)),
+         tot.withinss = map_dbl(model, ~ glance(.x)$tot.withinss))
+
+multi_kmeans
+```
+
+Now we can plot them:
+
+```{r}
+multi_kmeans %>% 
+  ggplot(aes(k, tot.withinss)) +
+  geom_point() +
+  geom_line()
+```
+
+To choose the final model, we `filter()`, `pull()`, and `pluck()`:
+
+```{r}
+final_kmeans <- 
+  multi_kmeans %>% 
+  filter(k == 2) %>% 
+  pull(model) %>% 
+  pluck(1)
+
+augment(final_kmeans, data = x_df) %>% 
+  ggplot(aes(V1, V2, color = .cluster)) +
+  geom_point()
+```
+
+## Hierarchical Clustering
+
+The `hclust()` is one way to perform hierarchical clustering in R. 
+
+```{r}
+res_hclust_complete <- 
+  x_df %>%
+  dist() %>%
+  hclust(method = "complete")
+
+res_hclust_average <- 
+  x_df %>%
+  dist() %>%
+  hclust(method = "average")
+
+res_hclust_single <- 
+  x_df %>%
+  dist() %>%
+  hclust(method = "single")
+```
+
+Then we can visualize:
+
+```{r}
+fviz_dend(res_hclust_complete, main = "complete", k = 2)
+
+fviz_dend(res_hclust_average, main = "average", k = 2)
+
+fviz_dend(res_hclust_average, main = "single", k = 2)
+```
+
+It could also be beneficial to scale the predictors to gauge their importance:
+
+```{r}
+x_df %>%
+  scale() %>%
+  dist() %>%
+  hclust(method = "complete") %>%
+  fviz_dend(k = 2)
+```
+
+We can also calculate the distances based on correlation:
+
+```{r}
+# correlation based distance
+set.seed(2)
+x <- matrix(rnorm(30 * 3), ncol = 3)
+
+x %>%
+  proxy::dist(method = "correlation") %>%
+  hclust(method = "complete") %>%
+  fviz_dend()
+```
+
+## PCA on the NCI60 Data
+
+```{r}
+data(NCI60, package = "ISLR2")
+
+nci60 <- 
+  NCI60$data %>% 
+  as_tibble() %>% 
+  magrittr::set_colnames(., paste0("v_", 1:ncol(.))) %>% 
+  mutate(label = factor(NCI60$labs)) %>% 
+  relocate(label)
+
+glimpse(nci60)
+```
+
+Perform the PCA:
+
+```{r}
+nci60_pca <- 
+  nci60 %>% 
+  select(-label) %>% 
+  prcomp(scale = TRUE)
+```
+
+Now we join the model predictions with the labeled points for visualization:
+
+```{r}
+nci60_pcs <- bind_cols(
+  augment(nci60_pca),
+  nci60 %>% select(label)
+)
+```
+
+We can plot different PCs against each other and its a good idea to compare the first PCs agains each other since they carry the most information. 
+
+```{r}
+colors <- unname(palette.colors(n = 14, palette = "Polychrome 36"))
+
+nci60_pcs %>% 
+  ggplot(aes(.fittedPC1, .fittedPC2, color = label)) +
+  geom_point() +
+  scale_color_manual(values = colors)
+```
+
+We can also plot the variance explained of each principal component:
+
+```{r}
+tidy(nci60_pca, matrix = "eigenvalues") %>% 
+  ggplot(aes(PC, percent)) +
+  geom_point() +
+  geom_line()
+```
+
+And the the cumulative variance explained:
+
+```{r}
+tidy(nci60_pca, matrix = "eigenvalues") %>% 
+  ggplot(aes(PC, cumulative)) +
+  geom_point() +
+  geom_line()
+```
+
+## Clustering on the `nci60` dataset
+
+We start by creating a scaled version of the data.
+
+```{r}
+nci60_scaled <- 
+  recipe(~ ., data = nci60) %>% 
+  step_rm(label) %>% 
+  step_normalize(all_predictors()) %>% 
+  prep() %>% 
+  bake(new_data = NULL)
+```
+
+Now we fit multiple mierarchical clustering models using different agglomeration methods:
+
+```{r}
+nci60_complete <- 
+  nci60_scaled %>%
+    dist() %>%
+    hclust(method = "complete")
+
+nci60_average <- 
+  nci60_scaled %>%
+    dist() %>%
+    hclust(method = "average")
+
+nci60_single <- 
+  nci60_scaled %>%
+    dist() %>%
+    hclust(method = "single")
+```
+
+And visualize:
+
+```{r}
+fviz_dend(nci60_complete, main = "Complete")
+
+fviz_dend(nci60_complete, main = "Average")
+
+fviz_dend(nci60_complete, main = "Single")
+```
+
+We can also color by the separations:
+
+```{r}
+nci60_complete %>% fviz_dend(k = 4)
+```
+
+To see which label is most common within each cluster, we can take the clustering id extracted with `cutree`:
+
+```{r}
+tibble(
+  label = nci60$label,
+  cluster_id = cutree(nci60_complete, k = 4)
+) %>% 
+  count(label, cluster_id) %>% 
+  group_by(cluster_id) %>% 
+  mutate(prop = n / sum(n)) %>% 
+  slice_max(n = 1, order_by = prop) %>% 
+  ungroup()
+```
+
+We could also use K-means clustering:
+
+```{r}
+set.seed(2)
+res_kmeans_scaled <- kmeans(nci60_scaled, centers = 4, nstart = 50)
+
+tidy(res_kmeans_scaled) %>% 
+  select(cluster, size, withinss)
+```
+
+Finally, we can compare each method with each other. 
+
+```{r}
+cluster_kmeans <- res_kmeans_scaled$cluster
+cluster_hclust <- cutree(nci60_complete, k = 4)
+
+tibble(
+  kmeans = factor(cluster_kmeans),
+  hclust = factor(cluster_hclust)
+) %>%
+  conf_mat(kmeans, hclust) %>%
+  autoplot(type = "heatmap")
+```
+
+Sometimes it is useful to perform dimensionality reduction before using the clustering method. 
+
+```{r}
+nci60_pca <- 
+  recipe(~., nci60_scaled) %>%
+  step_pca(all_predictors(), num_comp = 5) %>%
+  prep() %>%
+  bake(new_data = NULL)
+
+nci60_pca %>%
+  dist() %>%
+  hclust() %>%
+  fviz_dend(k = 4, main = "hclust on first five PCs")
+```
+

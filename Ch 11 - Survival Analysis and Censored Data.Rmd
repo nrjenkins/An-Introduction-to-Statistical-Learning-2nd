@@ -1,0 +1,184 @@
+---
+title: 'Chapter 11: Survival Analysis and Censored Data'
+author: "Nick Jenkins"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+Survival analysis and censored data arise when the outcome variable is the *time until an event occurs*. Suppose we have a five-year medical study in which patients have been treated for cancer. We want to fit a model to predict patient survival time, but there is a complication here: some or many of the patients have survived until the end of the study. Such a patient's survival time is said to be *censored*: we know that it is at least five years, but we do not know its true value.
+
+# Survival and Censoring Times
+
+For each individual, we suppose that there is a true *survival time* as well as a true *censoring time*, The survival time represents the time at which the event of interest occurs. By contrast, the censoring time is the time at which censoring occurs. If the event occurs before censoring then we observe the true survival time; however, if censoring occurs before the event then we observe the censoring time.
+
+# A Closer Look at Censoring
+
+We need to make assumptions about *why* censoring has occured. For instance, suppose that a number of patients drop out of a cancer study early because they are very sick. An analysis that does not take into consideration the reason why the patients dropped out will likely overestimate the true average survival time.
+
+We need to assume that the censoring mechanism is *independent*: conditional on the features, the event time is independent of the censoring time.
+
+Right censoring is when the true event time is at least as large as the observed time. In left censoring, the true event time is less than or equal to the observed time. Interval censoring refers to the setting in which we do not know the exact event time, but we know that it falls in some interval.
+
+# The Kaplan-Meier Survival Curve
+
+The Kaplan-Meier survival curve has a step-like shape. Each point in the step shows the estimated probability of surviving past the time indicated on the horizontal axis.
+
+# The Log-Rank Test
+
+Now we want to compare the survival of males to females. The presence of censoring creates a complication for a simple approach like a t-test. We use a *log-rank test* instead which examines how the events in each group unfold sequentially in time.
+
+# Regression Models with a Survival Response
+
+## The Hazard Function
+
+The hazard function is the death rate in the instant after time t, given survival past that time.
+
+## Proportional Hazards
+
+### The Proportional Hazards Assumption
+
+The proportional hazards assumption is the *baseline hazard* and it holds when the two groups are a constant multiple of each other, so that on the log scale, the gap between them is constant. 
+
+### Cox's Proportional Hazards Model
+
+### Connection With The Log-Rank Test
+
+### Additional Details
+
+## Example: Brain Cancer Data
+
+## Example: Publication Data
+
+# Shrinkage for the Cox Model
+
+We cannot use the normal train-test split approach to validate survival models. Instead, we stratify the observations using the coefficient estimates. For each test observation, we compute the risk score with coefficient estimates from the training set. We then use these risk scores to categorize the observations based on their "risk." 
+
+# Additional Topics
+
+## Area Under the Curve for Survival Analysis
+
+For AUC in survival analysis, we calculate an estimated risk score using the Cox model coefficients. Then we examine the model's predictions to see if it predicts that the *i*th observation has a larger hazard than the *i*th observation. 
+
+## Choice of Time Scale
+
+## Time-Dependent Covariates
+
+The proportional hazards model can handle *time-dependent covariates*, predictors whose value may change over time. 
+## Checking the Proportinal Hazards Assumption
+
+We can plot the log hazard function for each level of the feature. If the assumption holds, then the log hazard function should just differ by a constant. 
+
+## Survival Trees
+
+Survival trees use a split criterion that maximizes the difference between the survival curves in the resulting daughter nodes. 
+
+# Lab: Survival Analysis
+
+## Brain Cancer Data
+
+```{r}
+library(pacman)
+p_load(tidyverse, tidymodels, ISLR2, survival, censored)
+
+glimpse(BrainCancer)
+```
+
+To start we re-create the Kaplan-Meier survival curve. 
+
+```{r}
+fit_surv <- survfit(Surv(time, status) ~ 1, data = BrainCancer)
+plot(fit_surv)
+```
+
+Now we fit a Cox proportional hazards model:
+
+```{r}
+cox_spec <- 
+  proportional_hazards() %>% 
+  set_engine("survival")
+
+cox_fit <- fit(cox_spec, Surv(time, status) ~ sex, data = BrainCancer)
+tidy(cox_fit)
+glance(cox_fit)
+```
+
+These results show that there is no difference between males and females. 
+
+Now we fit a Cox model with additional predictors.
+
+```{r}
+cox_spec <- 
+  proportional_hazards() %>% 
+  set_engine("survival")
+
+cox_fit <- fit(cox_spec, 
+               Surv(time, status) ~ sex + diagnosis + loc + ki + gtv + stereo, 
+               data = BrainCancer)
+tidy(cox_fit)
+
+```
+
+These results show that the risk associated with HG glioma is more than (exp(2.15)) 8 times the risk associated with meningioma. 
+
+Now we plot survival curves. 
+
+```{r}
+modeldata <- data.frame(
+  diagnosis = levels(BrainCancer$diagnosis), 
+  sex = rep("Female", 4),
+  loc = rep("Supratentorial", 4), 
+  ki = rep(mean(BrainCancer$ki), 4),
+  gtv = rep(mean(BrainCancer$gtv), 4),
+  stereo = rep("SRT", 4)
+)
+
+cox_preds <- predict(cox_fit, new_data = modaldata, type = "survival", 
+                     time = seq(0, 80, 1))
+
+cox_preds <- 
+  cox_preds %>% 
+  mutate(id = factor(1:4)) %>% 
+  unnest(cols = .pred)
+
+ggplot(cox_preds, aes(x = .time, y = .pred_survival, col = id)) +
+  geom_step()
+```
+
+## Publication Data
+
+Kaplan-Meier Curve
+
+```{r}
+fit_posres <- 
+  survfit(Surv(time, status) ~ posres, data = Publication)
+
+plot(fit_posres, 
+     xlab = "Months", 
+     ylab = "Probability of Not Being Published", 
+     col = 3:4)
+legend("topright", c("Negative Result", "Positive Result"), col = 3:4, lty = 1)
+```
+
+Cox model:
+
+```{r}
+fit_pub <- 
+  proportional_hazards(engine = "survival") %>% 
+  fit(Surv(time, status) ~ posres, data = Publication)
+
+tidy(fit_pub)
+glance(fit_pub)
+```
+
+This model shows no evidence of a difference in time-to-publication between studies with positive versus negative results. 
+
+```{r}
+fit_pub2 <- 
+  proportional_hazards(engine = "survival") %>% 
+  fit(Surv(time, status) ~ . - mech, data = Publication)
+
+tidy(fit_pub2)
+glance(fit_pub2)
+```
+
+With additional covariates, the results change. 

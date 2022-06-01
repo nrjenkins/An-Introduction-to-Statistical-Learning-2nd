@@ -26,7 +26,7 @@ In theory, a single hidden layer with a large number of units has the ability to
 
 CNNs classify images by identifying local features and combining them to create compound features. The compound features are used to label the outputs. It builds the hierarchy by combining two special types of hidden layers, called *convolution* layers and *pooling* layers. Convolution layers search for instances of small patterns in the image, whereas pooling layers downsample these to select a prominent subset.
 
-## Convolution Layers 
+## Convolution Layers
 
 A *convolution layer* is made up of a large number of *convolution filters*, each of which is a template that determines whether a particular local feature is present in an image. A convolution filter relies on a very simple operation called a convolution, which basically amounts to repeatedly multiplying matrix elements and then adding the results.
 
@@ -168,7 +168,7 @@ Now we fit the neural network.
 
 ```{r}
 neural_net_model <- 
-  mlp(hidden_units = 50, dropout = 0.4, epochs = 1500,
+  mlp(hidden_units = 50, dropout = 0.4, epochs = 1500, batch_size = 32,
       mode = "regression") %>% 
   set_engine("keras")
 
@@ -179,6 +179,74 @@ linear_recipe <-
 snn_fit <- 
   neural_net_model %>% 
   fit(salary ~ ., data = hitters_train)
+
+snn_fit
+
+augment(snn_fit, new_data = hitters_test) %>% 
+  mae(truth = salary, estimate = .pred)
 ```
 
-\
+## A Multilayer Network on the MNIST Digit Data
+
+```{r}
+library(keras)
+mnist_data <- dataset_mnist()
+
+mnist_train <- as.data.frame(mnist_data[[1]])
+mnist_test <- as.data.frame(mnist_data[[2]])
+
+mnist_train %>% janitor::tabyl(y)
+```
+
+To look at some of the images, we can write a function:
+
+```{r}
+library(imager)
+
+display_image <- function(data) {
+  message("Displaying: ", data$y)
+  
+  data %>% 
+    select(-y) %>% 
+    unlist(use.names = FALSE) %>% 
+    as.cimg(x = 28, y = 28) %>% 
+    plot(axes = FALSE)
+}
+
+mnist_train %>% 
+  slice(3) %>% 
+  display_image()
+```
+
+```{r}
+mnn_model <- 
+  keras_model_sequential() %>% 
+  layer_dense(units = 256, activation = "relu", input_shape = c(784)) %>% 
+  layer_dropout(rate = 0.4) %>% 
+  layer_dense(units = 128, activation = "relu") %>% 
+  layer_dropout(rate = 0.3) %>% 
+  layer_dense(units = 10, activation = "softmax")
+
+mnn_model %>% 
+  compile(loss = "categorical_crossentropy",
+          optimizer = optimizer_rmsprop(),
+          metrics = c("accuracy"))
+
+mnist_train_2 <- bake(mnist_train, new_data = NULL, composition = "matrix")
+
+mnn_fit <- 
+  mnn_model %>% 
+  fit(x = mnist_train,
+      y = mnist_train$y,
+      epochs = 30,
+      batch_size = 128,
+      validation_split = 0.2)
+```
+
+```{r}
+library(brulee)
+mnn_fit <- 
+  brulee_mlp(y ~ ., data = mnist_train, hidden_units = c(256, 128, 10),
+             activation = c("relu", "relu", "elu"), 
+             epochs = 30, batch_size = 128)
+```
